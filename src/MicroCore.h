@@ -2,15 +2,15 @@
 // Created by mwo on 5/11/15.
 //
 
-#ifndef XMREG01_MICROCORE_H
-#define XMREG01_MICROCORE_H
+#ifndef LOKEG01_MICROCORE_H
+#define LOKEG01_MICROCORE_H
 
 #include <iostream>
 
-#include "monero_headers.h"
+#include "loki_headers.h"
 #include "tools.h"
 
-namespace xmreg
+namespace lokeg
 {
     using namespace cryptonote;
     using namespace crypto;
@@ -88,4 +88,4 @@ namespace xmreg
 
 
 
-#endif //XMREG01_MICROCORE_H
+#endif //LOKEG01_MICROCORE_H

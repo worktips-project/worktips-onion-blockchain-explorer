@@ -4,7 +4,7 @@
 
 #include "CurrentBlockchainStatus.h"
 
-namespace xmreg
+namespace lokeg
 {
 
 using namespace std;
@@ -190,7 +190,7 @@ CurrentBlockchainStatus::load_current_emission_amount()
 {
     string emmision_saved_file = get_output_file_path().string();
 
-    string last_saved_emmision = xmreg::read(emmision_saved_file);
+    string last_saved_emmision = lokeg::read(emmision_saved_file);
 
     if (last_saved_emmision.empty())
     {
@@ -297,13 +297,13 @@ CurrentBlockchainStatus::is_thread_running()
    return is_running;
 }
 
-bf::path CurrentBlockchainStatus::blockchain_path {"/home/mwo/.bitmonero/lmdb"};
+bf::path CurrentBlockchainStatus::blockchain_path {"/home/mwo/.loki/lmdb"};
 
 cryptonote::network_type CurrentBlockchainStatus::nettype {cryptonote::network_type::MAINNET};
 
 string CurrentBlockchainStatus::output_file {"emission_amount.txt"};
 
-string CurrentBlockchainStatus::deamon_url {"http:://127.0.0.1:22023"};
+string CurrentBlockchainStatus::daemon_url {"http:://127.0.0.1:22023"};
 
 uint64_t  CurrentBlockchainStatus::blockchain_chunk_size {10000};
 
@@ -318,5 +318,5 @@ boost::thread      CurrentBlockchainStatus::m_thread;
 atomic<bool>     CurrentBlockchainStatus::is_running {false};
 
 Blockchain*       CurrentBlockchainStatus::core_storage {nullptr};
-xmreg::MicroCore*  CurrentBlockchainStatus::mcore {nullptr};
+lokeg::MicroCore*  CurrentBlockchainStatus::mcore {nullptr};
 }
