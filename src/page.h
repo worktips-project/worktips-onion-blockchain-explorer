@@ -195,9 +195,9 @@ struct tx_details
 
 
         mstch::map txd_map {
-                {"hash"              , pod_to_hex(hash)},
-                {"prefix_hash"       , pod_to_hex(prefix_hash)},
-                {"pub_key"           , pod_to_hex(pk)},
+                {"hash"              , epee::string_tools::pod_to_hex(hash)},
+                {"prefix_hash"       , epee::string_tools::pod_to_hex(prefix_hash)},
+                {"pub_key"           , epee::string_tools::pod_to_hex(pk)},
                 {"tx_fee"            , fee_str},
                 {"tx_fee_short"      , fee_short_str},
                 {"payed_for_kB"      , payed_for_kB_str},
@@ -214,10 +214,10 @@ struct tx_details
                 {"has_payment_id"    , payment_id  != null_hash},
                 {"has_payment_id8"   , payment_id8 != null_hash8},
                 {"pID"               , string {pID}},
-                {"payment_id"        , pod_to_hex(payment_id)},
+                {"payment_id"        , epee::string_tools::pod_to_hex(payment_id)},
                 {"confirmations"     , no_confirmations},
                 {"extra"             , get_extra_str()},
-                {"payment_id8"       , pod_to_hex(payment_id8)},
+                {"payment_id8"       , epee::string_tools::pod_to_hex(payment_id8)},
                 {"unlock_time"       , unlock_time},
                 {"tx_size"           , fmt::format("{:0.4f}", tx_size)},
                 {"tx_size_short"     , fmt::format("{:0.2f}", tx_size)},
@@ -270,7 +270,6 @@ struct tx_details
 
     ~tx_details() {};
 };
-
 
 class page
 {
@@ -830,7 +829,7 @@ public:
         }
 
         context["network_info"] = mstch::map {
-                {"difficulty"        , current_network_info.difficulty},
+                {"difficulty"        , lokeg::make_comma_sep_number(current_network_info.difficulty)},
                 {"hash_rate"         , hash_rate},
                 {"fee_per_kb"        , print_money(current_network_info.fee_per_kb)},
                 {"alt_blocks_no"     , current_network_info.alt_blocks_count},
@@ -844,10 +843,8 @@ public:
                 {"age"               , network_info_age.first},
                 {"age_format"        , network_info_age.second},
         };
-
         // median size of 100 blocks
         context["blk_size_median"] = string {current_network_info.block_size_median_str};
-
         string mempool_html {"Cant get mempool_pool"};
 
         // get mempool data for the front page, if ready. If not, then just skip.
@@ -874,9 +871,10 @@ public:
             string emission_fee      = lok_amount_to_str(current_values.fee, "{:0.3f}");
 
             context["emission"] = mstch::map {
-                    {"blk_no"    , emission_blk_no},
-                    {"amount"    , emission_coinbase},
-                    {"fee_amount", emission_fee}
+                    {"blk_no"            , emission_blk_no},
+                    {"amount"            , emission_coinbase},
+                    {"fee_amount"        , emission_fee},
+                    {"circulating_supply", lokeg::make_comma_sep_number(CurrentBlockchainStatus::circulating_supply)}
             };
         }
         else
@@ -5222,9 +5220,10 @@ public:
             string emission_fee      = lok_amount_to_str(current_values.fee, "{:0.3f}", false);
 
             j_data = json {
-                    {"blk_no"  , current_values.blk_no - 1},
-                    {"coinbase", current_values.coinbase},
-                    {"fee"     , current_values.fee},
+                    {"blk_no"             , current_values.blk_no - 1},
+                    {"coinbase"           , current_values.coinbase},
+                    {"fee"                , current_values.fee},
+                    {"circulating_supply" , CurrentBlockchainStatus::circulating_supply},
             };
         }
 
@@ -5527,7 +5526,6 @@ private:
         tx_details txd = get_tx_details(tx);
 
         const crypto::hash& tx_hash = txd.hash;
-
         string tx_hash_str = pod_to_hex(tx_hash);
 
         uint64_t tx_blk_height {0};
@@ -6015,7 +6013,6 @@ private:
 
         return make_pair(mixins_timescales, timescale_scale);
     }
-
 
     tx_details
     get_tx_details(const transaction& tx,

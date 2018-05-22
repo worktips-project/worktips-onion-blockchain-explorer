@@ -5,15 +5,11 @@
 #ifndef LOKBLOCKS_CURRENTBLOCKCHAINSTATUS_H
 #define LOKBLOCKS_CURRENTBLOCKCHAINSTATUS_H
 
+#include "mstch/mstch.hpp"
+#include "loki_headers.h"
 #include "MicroCore.h"
 
 #include <boost/algorithm/string.hpp>
-
-#include <iostream>
-#include <memory>
-#include <thread>
-#include <mutex>
-#include <atomic>
 
 namespace lokeg
 {
@@ -44,6 +40,10 @@ struct CurrentBlockchainStatus
                    + "," + to_string(fee) + "," + to_string(checksum());
         }
     };
+
+    static uint64_t circulating_supply;
+    static uint64_t circulating_supply_calc_from_height;
+    static bool     circulating_supply_is_accurate;
 
     static bf::path blockchain_path;
 

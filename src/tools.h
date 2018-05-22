@@ -370,6 +370,9 @@ calc_median(It it_begin, It it_end)
 void
 pause_execution(uint64_t no_seconds, const string& text = "now");
 
+string
+make_comma_sep_number(uint64_t value);
+
 }
 
 #endif //LOKEG01_TOOLS_H

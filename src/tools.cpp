@@ -1266,4 +1266,45 @@ pause_execution(uint64_t no_seconds, const string& text)
     cout << endl;
 }
 
+string
+make_comma_sep_number(uint64_t value)
+{
+    string result;
+    result.reserve(20/*Digits*/ + 6 /*Commas*/);
+
+    uint64_t tmp = value;
+    int len = 0;
+    int thousands_count = -1;
+
+    for (; tmp > 0; tmp /= 10)
+    {
+        len++;
+        if (++thousands_count == 3)
+        {
+            len++;
+            thousands_count = 0;
+        }
+    }
+
+    result.append(len, ',');
+    len--;
+    thousands_count = 0;
+
+    for (tmp = value; tmp > 0; len--)
+    {
+        if (thousands_count++ == 3)
+        {
+            thousands_count = 0;
+        }
+        else
+        {
+            char digit = '0' + (tmp % 10);
+            tmp /= 10;
+            result.replace(len, 1, 1, digit);
+        }
+    }
+
+    return result;
+}
+
 }
