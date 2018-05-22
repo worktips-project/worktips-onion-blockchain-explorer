@@ -5215,10 +5215,6 @@ public:
             CurrentBlockchainStatus::Emission current_values
                     = CurrentBlockchainStatus::get_emission();
 
-            string emission_blk_no   = std::to_string(current_values.blk_no - 1);
-            string emission_coinbase = lok_amount_to_str(current_values.coinbase, "{:0.3f}");
-            string emission_fee      = lok_amount_to_str(current_values.fee, "{:0.3f}", false);
-
             j_data = json {
                     {"blk_no"             , current_values.blk_no - 1},
                     {"coinbase"           , current_values.coinbase},

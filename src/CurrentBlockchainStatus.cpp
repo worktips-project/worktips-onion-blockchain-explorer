@@ -79,55 +79,52 @@ static void update_circulating_supply()
     CurrentBlockchainStatus::circulating_supply_calc_from_height = curr_height;
 
     block latest_block;
-    if (!CurrentBlockchainStatus::mcore->get_block_by_height(curr_height - 1, latest_block))
+    if (CurrentBlockchainStatus::mcore->get_block_by_height(curr_height - 1, latest_block))
     {
-        return;
-    }
-
 #define ARRAY_COUNT(array) (sizeof(array) / sizeof(array[0]))
 #define DAY_TO_S(time)    (HOUR_TO_S(time) * 24ULL)
 #define HOUR_TO_S(time)   (MINUTE_TO_S(time) * 60ULL)
 #define MINUTE_TO_S(time) ((time) * 60ULL)
-    struct LockedAmounts
-    {
-        uint64_t time;
-        uint64_t amount;
-    };
-
-    uint64_t const founders_locked_tokens            = 1215000;
-    uint64_t const seed_locked_tokens                = 581000;
-    uint64_t const half_seed_locked_tokens           = seed_locked_tokens * 0.5f;
-    static int locked_tx_end_timestamps_index        = 0;
-    static LockedAmounts const locked_tx_end_timestamps[] =
-    {
-        {1525853753 + DAY_TO_S(90),  founders_locked_tokens + seed_locked_tokens},
-        {1525856674 + DAY_TO_S(180), founders_locked_tokens + seed_locked_tokens},
-        {1525859150 + DAY_TO_S(270), founders_locked_tokens + seed_locked_tokens},
-        {1525862680 + DAY_TO_S(360), founders_locked_tokens + half_seed_locked_tokens}
-    };
-
-    for (; locked_tx_end_timestamps_index < ARRAY_COUNT(locked_tx_end_timestamps); locked_tx_end_timestamps_index++)
-    {
-        LockedAmounts const *locked_tx = locked_tx_end_timestamps + locked_tx_end_timestamps_index;
-        if (latest_block.timestamp < locked_tx->time)
+        struct LockedAmounts
         {
-            break;
-        }
+            uint64_t time;
+            uint64_t amount;
+        };
 
-        CurrentBlockchainStatus::circulating_supply += locked_tx->amount;
-    }
+        uint64_t const founders_locked_tokens            = 1215000;
+        uint64_t const seed_locked_tokens                = 581000;
+        uint64_t const half_seed_locked_tokens           = seed_locked_tokens * 0.5f;
+        static int locked_tx_end_timestamps_index        = 0;
+        static LockedAmounts const locked_tx_end_timestamps[] =
+        {
+            {1525853753 + DAY_TO_S(90),  founders_locked_tokens + seed_locked_tokens},
+            {1525856674 + DAY_TO_S(180), founders_locked_tokens + seed_locked_tokens},
+            {1525859150 + DAY_TO_S(270), founders_locked_tokens + seed_locked_tokens},
+            {1525862680 + DAY_TO_S(360), founders_locked_tokens + half_seed_locked_tokens}
+        };
+
+        for (; locked_tx_end_timestamps_index < ARRAY_COUNT(locked_tx_end_timestamps); locked_tx_end_timestamps_index++)
+        {
+            LockedAmounts const *locked_tx = locked_tx_end_timestamps + locked_tx_end_timestamps_index;
+            if (latest_block.timestamp < locked_tx->time)
+            {
+                break;
+            }
+
+            CurrentBlockchainStatus::circulating_supply += locked_tx->amount;
+        }
 #undef ARRAY_COUNT
 #undef DAY_TO_S
 #undef HOUR_TO_S
 #undef MINUTE_TO_S
+    }
 }
 
 
 void
 CurrentBlockchainStatus::start_monitor_blockchain_thread()
 {
-    total_emission_atomic = Emission {0, 0, 0};
-
+    total_emission_atomic = Emission{};
     string emmision_saved_file = get_output_file_path().string();
 
     // read stored emission data if possible
@@ -205,9 +202,7 @@ CurrentBlockchainStatus::update_current_emission_amount()
     Emission current_emission = total_emission_atomic;
 
     uint64_t blk_no = current_emission.blk_no;
-
     uint64_t end_block = blk_no + blockchain_chunk_size;
-
     uint64_t current_blockchain_height = current_height;
 
     // blockchain_chunk_gap is used so that we
@@ -313,16 +308,16 @@ CurrentBlockchainStatus::load_current_emission_amount()
         return false;
     }
 
-    Emission emission_loaded {0, 0, 0};
+    Emission emission_loaded = {};
 
     uint64_t read_check_sum {0};
 
     try
     {
-        emission_loaded.blk_no   = boost::lexical_cast<uint64_t>(strs.at(0));
-        emission_loaded.coinbase = boost::lexical_cast<uint64_t>(strs.at(1));
-        emission_loaded.fee      = boost::lexical_cast<uint64_t>(strs.at(2));
-        read_check_sum           = boost::lexical_cast<uint64_t>(strs.at(3));
+        emission_loaded.blk_no             = boost::lexical_cast<uint64_t>(strs.at(0));
+        emission_loaded.coinbase           = boost::lexical_cast<uint64_t>(strs.at(1));
+        emission_loaded.fee                = boost::lexical_cast<uint64_t>(strs.at(2));
+        read_check_sum                     = boost::lexical_cast<uint64_t>(strs.at(3));
     }
     catch (boost::bad_lexical_cast &e)
     {
