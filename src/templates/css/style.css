@@ -1,8 +1,8 @@
 body {
     margin: 0;
     padding: 0;
-    color: white;
-    background-color: black;
+    color: #008522;
+    background-color: #1a1a1a;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -32,23 +32,23 @@ td {
 }
 
 a:link {
-    text-decoration: none;
-    color: white;
+    text-decoration: underline;
+    color: #78be20;
 }
 
 a:visited {
-    text-decoration: none;
-    color: white;
+    text-decoration: underline;
+    color: #78be20;
 }
 
 a:hover {
     text-decoration: underline;
-    color: white;
+    color: purple;
 }
 
 a:active {
-    text-decoration: none;
-    color: white;
+    text-decoration: underline;
+    color: purple;
 }
 
 form {
@@ -66,7 +66,7 @@ form {
     border: solid 1px #707070;
     box-shadow: 0 0 5px 1px #969696;
 }
-
+h1, h2, h3, h4, h5, h6 { color: white; }
 
 .tabs {
     position: relative;
@@ -105,7 +105,7 @@ form {
 
 [type=radio]:checked ~ label {
     background: #505050 ;
-    border-bottom: 1px solid white;
+    border-bottom: 1px solid #008522;
     z-index: 2;
 }
 
@@ -126,7 +126,7 @@ label#show-decoded-inputs {
     /*margin: 60px 0 10px 0;*/
     cursor: pointer;
     background-color: black;;
-    color: white;
+    color: #008522;
     width: 100%;
     text-align: center;
 }
