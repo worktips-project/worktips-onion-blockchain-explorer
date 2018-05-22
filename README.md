@@ -706,6 +706,7 @@ curl  -w "\n" -X GET "http://127.0.0.1:8081/api/emission"
   "data": {
     "blk_no": 1313969,
     "coinbase": 14489473877253413000,
+    "circulating_supply": 1234567,
     "fee": 52601974988641130
   },
   "status": "success"
