@@ -30,12 +30,13 @@ namespace lokeg
 
         Blockchain m_blockchain_storage;
         tx_memory_pool m_mempool;
-        service_nodes::service_node_list m_service_node_list;
         loki::deregister_vote_pool m_deregister_vote_pool;
 
         hw::device* m_device;
 
     public:
+        service_nodes::service_node_list m_service_node_list;
+
         MicroCore();
 
         bool
