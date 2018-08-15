@@ -488,7 +488,7 @@ public:
 
     }
 
-    void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::vector<COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry *> const *entries)
+    void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::vector<COMMAND_RPC_GET_SERVICE_NODES::response::entry *> const *entries)
     {
         static std::string num_contributors_str;
         num_contributors_str.reserve(8);
@@ -502,7 +502,7 @@ public:
 
         for (size_t i = 0; i < iterate_count; ++i, num_contributors_str.clear())
         {
-            COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry const *entry = (*entries)[i];
+            COMMAND_RPC_GET_SERVICE_NODES::response::entry const *entry = (*entries)[i];
             num_contributors_str += std::to_string(entry->contributors.size());
             num_contributors_str += "/";
             num_contributors_str += std::to_string(MAX_NUMBER_OF_CONTRIBUTORS);
@@ -535,8 +535,8 @@ public:
     {
         bool on_homepage = !add_header_and_footer;
 
-        COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response response;
-        if (!rpc.get_service_node_list_state(response, {}))
+        COMMAND_RPC_GET_SERVICE_NODES::response response;
+        if (!rpc.get_service_node(response, {}))
         {
           return (on_homepage) ? m_snode_context.html_context : m_snode_context.html_full_context;
         }
@@ -549,8 +549,8 @@ public:
         page_context.emplace(awaiting_array_id, mstch::array());
 
         // Split and sort the entries
-        std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry *> unregistered;
-        std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry *> registered;
+        std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *> unregistered;
+        std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *> registered;
         {
             registered.reserve  (response.service_node_states.size());
             unregistered.reserve(response.service_node_states.size() * 0.5f);
@@ -568,7 +568,7 @@ public:
             }
 
             std::sort(unregistered.begin(), unregistered.end(),
-                [](const cryptonote::COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry *a, const cryptonote::COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry *b) {
+                [](const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *a, const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *b) {
                 uint64_t a_remaining = a->staking_requirement - a->total_reserved;
                 uint64_t b_remaining = b->staking_requirement - b->total_reserved;
 
@@ -579,7 +579,7 @@ public:
             });
 
             std::stable_sort(registered.begin(), registered.end(),
-                [](const cryptonote::COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry *a, const cryptonote::COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry *b) {
+                [](const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *a, const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *b) {
                 if (a->last_reward_block_height == b->last_reward_block_height)
                   return a->last_reward_transaction_index < b->last_reward_transaction_index;
 
@@ -1437,8 +1437,8 @@ public:
     string
     show_service_node(const std::string &service_node_pubkey)
     {
-        COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response response;
-        if (!rpc.get_service_node_list_state(response, {service_node_pubkey}))
+        COMMAND_RPC_GET_SERVICE_NODES::response response;
+        if (!rpc.get_service_node(response, {service_node_pubkey}))
         {
           cerr << "Failed to rpc with daemon " << service_node_pubkey << endl;
           return std::string("Failed to rpc with daemon " + service_node_pubkey);
@@ -1452,7 +1452,7 @@ public:
         }
 
         mstch::map page_context {};
-        COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::entry const *entry = &response.service_node_states[0];
+        COMMAND_RPC_GET_SERVICE_NODES::response::entry const *entry = &response.service_node_states[0];
 
         // Make metadata render data
         static std::string friendly_uptime_proof_not_received = "Not Received";
@@ -1473,7 +1473,7 @@ public:
         char const service_node_contributors_array_id[] = "service_node_contributors_array";
         page_context.emplace(service_node_contributors_array_id, mstch::array{});
         mstch::array& contributors = boost::get<mstch::array>(page_context[service_node_contributors_array_id]);
-        for (COMMAND_RPC_GET_SERVICE_NODE_LIST_STATE::response::contribution const &contributor : entry->contributors)
+        for (COMMAND_RPC_GET_SERVICE_NODES::response::contribution const &contributor : entry->contributors)
         {
           mstch::map array_entry
           {
