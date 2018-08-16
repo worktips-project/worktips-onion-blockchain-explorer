@@ -35,25 +35,19 @@ MicroCore::MicroCore():
  * Initialize m_blockchain_storage with the BlockchainLMDB object.
  */
 bool
-MicroCore::init(const string& _blockchain_path)
+MicroCore::init(const string& _blockchain_path, network_type nt)
 {
     int db_flags = 0;
 
     blockchain_path = _blockchain_path;
 
-    //db_flags |= MDB_RDONLY;
+    nettype = nt;
+
+    db_flags |= MDB_RDONLY;
     db_flags |= MDB_NOLOCK;
-    //db_flags |= MDB_SYNC;
-
-    // uint64_t DEFAULT_FLAGS = MDB_NOMETASYNC | MDB_NORDAHEAD;
-
-    //db_flags = DEFAULT_FLAGS;
-
-    HardFork* m_hardfork = nullptr;
 
     BlockchainDB* db = nullptr;
     db = new BlockchainLMDB();
-    m_hardfork = new HardFork(*db, 1);
 
     try
     {
@@ -69,13 +63,11 @@ MicroCore::init(const string& _blockchain_path)
     // check if the blockchain database
     // is successful opened
     if(!db->is_open())
-    {
         return false;
-    }
 
     // initialize Blockchain object to manage
     // the database.
-    return m_blockchain_storage.init(db, m_hardfork, network_type::MAINNET);
+    return m_blockchain_storage.init(db, nettype);
 }
 
 /**
@@ -322,11 +314,12 @@ MicroCore::~MicroCore()
 bool
 init_blockchain(const string& path,
                 MicroCore& mcore,
-                Blockchain*& core_storage)
+                Blockchain*& core_storage,
+                network_type nt)
 {
 
     // initialize the core using the blockchain path
-    if (!mcore.init(path))
+    if (!mcore.init(path, nt))
     {
         cerr << "Error accessing blockchain." << endl;
         return false;
