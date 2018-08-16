@@ -5881,8 +5881,24 @@ private:
             }
             else if (get_service_node_register_from_tx_extra(tx.extra, register_))
             {
+                // TODO(doyle): We should add a url for jumping to the node,
+                // maybe. We only have information about the current state of
+                // the network, so previous expired nodes no longer can be
+                // accessed. This needs the store to db functionality.
+                crypto::public_key snode_key;
+                if (get_service_node_pubkey_from_tx_extra(tx.extra, snode_key))
+                {
+                  context["register_service_node_pubkey"] = pod_to_hex(snode_key);
+                }
+                else
+                {
+                  static std::string parsing_error = "<pubkey parsing error>";
+                  context["register_service_node_pubkey"] = parsing_error;
+                }
+
                 context["have_register_info"]             = true;
                 context["register_portions_for_operator"] = portions_to_percent(register_.m_portions_for_operator);
+                context["register_expiration_timestamp_friendly"]  = timestamp_to_str_gm(register_.m_expiration_timestamp);
                 context["register_expiration_timestamp"]  = register_.m_expiration_timestamp;
                 context["register_signature"]             = pod_to_hex(register_.m_service_node_signature);
 

@@ -77,14 +77,17 @@
     {{#have_register_info}}
         <h2>Service Node Register Metadata</h2>
         <div class="TitleDivider"></div>
+        <p>Service Node Public Key: {{register_service_node_pubkey}}</p>
         <p>Portions For Operator: {{register_portions_for_operator}}%</p>
-        <p>Expiration Timestamp: {{register_expiration_timestamp}}</p>
+        <p>Expiration Timestamp: {{register_expiration_timestamp_friendly}} ({{register_expiration_timestamp}})</p>
         <p>Signature: {{register_signature}}</p>
 
+        <h2>Service Node Register Payout Addresses</h2>
+        <div class="TitleDivider"></div>
         <table class="Table">
             <tr class="TableHeader">
-                <td>Spend Key</td>
-                <td>View Key</td>
+                <td>Public Spend Key</td>
+                <td>Public View Key</td>
                 <td>Portions</td>
             </tr>
 
