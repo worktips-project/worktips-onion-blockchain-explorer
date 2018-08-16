@@ -488,6 +488,12 @@ public:
 
     }
 
+    int portions_to_percent(int portions)
+    {
+        int result = (int)(((portions / STAKING_PORTIONS) * 100.0f) + 0.5f);
+        return result;
+    }
+
     void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::vector<COMMAND_RPC_GET_SERVICE_NODES::response::entry *> const *entries)
     {
         static std::string num_contributors_str;
@@ -508,7 +514,7 @@ public:
             num_contributors_str += std::to_string(MAX_NUMBER_OF_CONTRIBUTORS);
 
             uint64_t contribution_remaining = entry->staking_requirement - entry->total_reserved;
-            int operator_cut_in_percent = (int)(((entry->portions_for_operator / STAKING_PORTIONS) * 100.0f) + 0.5f);
+            int operator_cut_in_percent = portions_to_percent(entry->portions_for_operator);
 
             mstch::map array_entry
             {
@@ -1710,7 +1716,6 @@ public:
                     "{:0.4f}", static_cast<double>(duration.count())/1.0e6);
 
         } // else if (tx_context_cache.Contains(tx_hash))
-
 
         tx_context["show_more_details_link"] = show_more_details_link;
 
@@ -5837,6 +5842,73 @@ private:
                 {"from_cache"            , false},
                 {"construction_time"     , string {}},
         };
+
+        if (tx.version == transaction::version_3_per_output_unlock_times)
+        {
+            tx_extra_service_node_deregister deregister;
+            tx_extra_service_node_register   register_;
+            if (tx.is_deregister_tx())
+            {
+                context["have_deregister_info"] = true;
+                if (get_service_node_deregister_from_tx_extra(tx.extra, deregister))
+                {
+                  context["deregister_service_node_index"]   = deregister.service_node_index;
+                  context["deregister_block_height"]         = deregister.block_height;
+
+                  char const vote_array_id[] = "deregister_vote_array";
+                  context.emplace(vote_array_id, mstch::array());
+
+                  mstch::array& vote_array = boost::get<mstch::array>(context[vote_array_id]);
+                  vote_array.reserve(deregister.votes.size());
+
+                  for (tx_extra_service_node_deregister::vote &vote : deregister.votes)
+                  {
+                    mstch::map entry
+                    {
+                      {"deregister_voters_quorum_index", vote.voters_quorum_index},
+                      {"deregister_signature",           pod_to_hex(vote.signature)},
+                    };
+
+                    vote_array.push_back(entry);
+                  }
+                }
+                else
+                {
+                  static std::string unknown = "??";
+                  context["deregister_service_node_index"] = unknown;
+                  context["deregister_block_height"]       = unknown;
+                }
+            }
+            else if (get_service_node_register_from_tx_extra(tx.extra, register_))
+            {
+                context["have_register_info"]             = true;
+                context["register_portions_for_operator"] = portions_to_percent(register_.m_portions_for_operator);
+                context["register_expiration_timestamp"]  = register_.m_expiration_timestamp;
+                context["register_signature"]             = pod_to_hex(register_.m_service_node_signature);
+
+                char const array_id[] = "register_array";
+                context.emplace(array_id, mstch::array());
+
+                mstch::array& array = boost::get<mstch::array>(context[array_id]);
+                array.reserve(register_.m_public_spend_keys.size());
+
+                for (size_t i = 0; i < register_.m_public_spend_keys.size(); ++i)
+                {
+                  crypto::public_key const &spend_key = register_.m_public_spend_keys[i];
+                  crypto::public_key const &view_key =  register_.m_public_view_keys[i];
+                  uint32_t portion = register_.m_portions[i];
+
+                  mstch::map entry
+                  {
+                    {"register_spend_key", pod_to_hex(spend_key)},
+                    {"register_view_key", pod_to_hex(view_key)},
+                    {"register_portions", portions_to_percent(portion)},
+                  };
+
+                  array.push_back(entry);
+                }
+            }
+        }
 
         // append tx_json as in raw format to html
         context["tx_json_raw"] = mstch::lambda{[=](const std::string& text) -> mstch::node {

@@ -418,7 +418,7 @@ rpccalls::get_service_node(COMMAND_RPC_GET_SERVICE_NODES::response &res, const s
     request.params.service_node_pubkeys = pubkeys;
     request.jsonrpc = "2.0";
     request.id      = epee::serialization::storage_entry(0);
-    request.method  = "get_service_node";
+    request.method  = "get_service_nodes";
 
     result = epee::net_utils::invoke_http_json("/json_rpc", request, response, m_http_client, timeout_time_ms);
 
