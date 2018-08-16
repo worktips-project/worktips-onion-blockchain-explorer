@@ -490,7 +490,7 @@ public:
 
     int portions_to_percent(int portions)
     {
-        int result = (int)(((portions / STAKING_PORTIONS) * 100.0f) + 0.5f);
+        int result = (int)(((portions / (float)STAKING_PORTIONS) * 100.0f) + 0.5f);
         return result;
     }
 
@@ -1462,7 +1462,7 @@ public:
 
         // Make metadata render data
         static std::string friendly_uptime_proof_not_received = "Not Received";
-        int operator_cut_in_percent = (int)(((entry->portions_for_operator / STAKING_PORTIONS) * 100.0f) + 0.5f);
+        int operator_cut_in_percent = portions_to_percent(entry->portions_for_operator);
 
         page_context["public_key"]           = entry->service_node_pubkey;
         page_context["last_reward_at_block"] = entry->last_reward_block_height;
