@@ -5931,7 +5931,7 @@ private:
                 context["have_register_info"]             = true;
                 context["register_portions_for_operator"] = portions_to_percent(register_.m_portions_for_operator);
                 context["register_expiration_timestamp_friendly"]  = timestamp_to_str_gm(register_.m_expiration_timestamp);
-                context["register_expiration_timestamp_relative"]  = get_human_time_ago(register_.m_expiration_timestamp, time(nullptr));
+                context["register_expiration_timestamp_relative"]  = std::string(get_human_time_ago(register_.m_expiration_timestamp, time(nullptr)));
                 context["register_expiration_timestamp"]  = register_.m_expiration_timestamp;
                 context["register_signature"]             = pod_to_hex(register_.m_service_node_signature);
 

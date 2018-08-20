@@ -36,12 +36,13 @@
       <table style="width:100%">
           <tr class="TableHeader">
               <td>Public Key</td>
-              <td>No. Contributors</td>
+              <td>Contributors</td>
               <td>Operator Cut (%)</td>
-              <td>Amount Open For Contribution</td>
+              <td>Open For Contribution</td>
               <td>Contributed</td>
               <td>Reserved</td>
               <td>Staking Requirement</td>
+              <td>Expiry Date UTC (Estimated)</td>
           </tr>
 
           {{#service_node_awaiting_array}}
@@ -53,6 +54,7 @@
               <td>{{contributed}}</td>
               <td>{{reserved}}</td>
               <td>{{staking_requirement}}</td>
+              <td>{{expiration_date}} ({{expiration_time_relative}})</td>
           </tr>
           {{/service_node_awaiting_array}}
       </table>
