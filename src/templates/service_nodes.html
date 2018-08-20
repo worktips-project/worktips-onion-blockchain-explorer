@@ -8,11 +8,12 @@
       <table style="width:100%">
           <tr class="TableHeader">
               <td>Public Key</td>
-              <td>No. Contributors</td>
+              <td>Contributors</td>
               <td>Operator Cut (%)</td>
               <td>Staking Requirement</td>
-              <td>Last Reward At (Block Height/TX Index)</td>
+              <td>Last Reward At Height</td>
               <td>Last Uptime Proof</td>
+              <td>Expiry Date UTC (Estimated)</td>
           </tr>
 
           {{#service_node_active_array}}
@@ -21,8 +22,9 @@
               <td>{{num_contributors}}</td>
               <td>{{operator_cut}}</td>
               <td>{{staking_requirement}}</td>
-              <td>{{last_reward_at_block}}/{{last_reward_at_block_tx_index}}</td>
+              <td>{{last_reward_at_block}}</td>
               <td>{{last_uptime_proof}}</td>
+              <td>{{expiration_date}} ({{expiration_time_relative}})</td>
           </tr>
           {{/service_node_active_array}}
       </table>
@@ -37,8 +39,8 @@
               <td>No. Contributors</td>
               <td>Operator Cut (%)</td>
               <td>Amount Open For Contribution</td>
-              <td>Total Contributed</td>
-              <td>Total Reserved</td>
+              <td>Contributed</td>
+              <td>Reserved</td>
               <td>Staking Requirement</td>
           </tr>
 
@@ -48,8 +50,8 @@
               <td>{{num_contributors}}</td>
               <td>{{operator_cut}}</td>
               <td>{{open_for_contribution}}</td>
-              <td>{{total_contributed}}</td>
-              <td>{{total_reserved}}</td>
+              <td>{{contributed}}</td>
+              <td>{{reserved}}</td>
               <td>{{staking_requirement}}</td>
           </tr>
           {{/service_node_awaiting_array}}
