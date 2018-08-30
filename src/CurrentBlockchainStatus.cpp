@@ -24,6 +24,31 @@ CurrentBlockchainStatus::set_blockchain_variables(MicroCore* _mcore,
     core_storage =_core_storage;
 }
 
+struct LockedAmounts
+{
+    uint64_t time;
+    uint64_t amount;
+};
+
+#define DAY_TO_S(time)    (HOUR_TO_S(time) * 24ULL)
+#define HOUR_TO_S(time)   (MINUTE_TO_S(time) * 60ULL)
+#define MINUTE_TO_S(time) ((time) * 60ULL)
+uint64_t const founders_locked_tokens            = 1215000;
+uint64_t const seed_locked_tokens                = 581000;
+uint64_t const half_seed_locked_tokens           = seed_locked_tokens * 0.5f;
+static int locked_tx_end_timestamps_index        = 0;
+static LockedAmounts const locked_tx_end_timestamps[] =
+{
+    {1525853753 + DAY_TO_S(90),  founders_locked_tokens + seed_locked_tokens},
+    {1525856674 + DAY_TO_S(180), founders_locked_tokens + seed_locked_tokens},
+    {1525859150 + DAY_TO_S(270), founders_locked_tokens + seed_locked_tokens},
+    {1525862680 + DAY_TO_S(360), founders_locked_tokens + half_seed_locked_tokens}
+};
+#undef DAY_TO_S
+#undef HOUR_TO_S
+#undef MINUTE_TO_S
+
+
 #define ARRAY_COUNT(array) (sizeof(array)/sizeof(array[0]))
 static void update_circulating_supply()
 {
@@ -73,6 +98,7 @@ static void update_circulating_supply()
 
         uint64_t block_reward = (sum_money_in_outputs(blk.miner_tx) - fees) / 1000000000;
         CurrentBlockchainStatus::circulating_supply += block_reward;
+
     }
 
     CurrentBlockchainStatus::circulating_supply_calc_from_height = curr_height;
@@ -80,27 +106,6 @@ static void update_circulating_supply()
     block latest_block;
     if (CurrentBlockchainStatus::mcore->get_block_by_height(curr_height - 1, latest_block))
     {
-#define DAY_TO_S(time)    (HOUR_TO_S(time) * 24ULL)
-#define HOUR_TO_S(time)   (MINUTE_TO_S(time) * 60ULL)
-#define MINUTE_TO_S(time) ((time) * 60ULL)
-        struct LockedAmounts
-        {
-            uint64_t time;
-            uint64_t amount;
-        };
-
-        uint64_t const founders_locked_tokens            = 1215000;
-        uint64_t const seed_locked_tokens                = 581000;
-        uint64_t const half_seed_locked_tokens           = seed_locked_tokens * 0.5f;
-        static int locked_tx_end_timestamps_index        = 0;
-        static LockedAmounts const locked_tx_end_timestamps[] =
-        {
-            {1525853753 + DAY_TO_S(90),  founders_locked_tokens + seed_locked_tokens},
-            {1525856674 + DAY_TO_S(180), founders_locked_tokens + seed_locked_tokens},
-            {1525859150 + DAY_TO_S(270), founders_locked_tokens + seed_locked_tokens},
-            {1525862680 + DAY_TO_S(360), founders_locked_tokens + half_seed_locked_tokens}
-        };
-
         for (; locked_tx_end_timestamps_index < ARRAY_COUNT(locked_tx_end_timestamps); locked_tx_end_timestamps_index++)
         {
             LockedAmounts const *locked_tx = locked_tx_end_timestamps + locked_tx_end_timestamps_index;
@@ -111,9 +116,6 @@ static void update_circulating_supply()
 
             CurrentBlockchainStatus::circulating_supply += locked_tx->amount;
         }
-#undef DAY_TO_S
-#undef HOUR_TO_S
-#undef MINUTE_TO_S
     }
 
     FILE *circulating_supply_file = fopen("circulating_supply_cache.txt", "w+");
@@ -147,6 +149,29 @@ CurrentBlockchainStatus::start_monitor_blockchain_thread()
       CurrentBlockchainStatus::circulating_supply = atoi(line_ptr);
       CurrentBlockchainStatus::circulating_supply_is_accurate = true;
       fclose(circulating_supply_file);
+
+      block blk;
+      if (!CurrentBlockchainStatus::mcore->get_block_by_height(
+              CurrentBlockchainStatus::circulating_supply_calc_from_height - 1, blk))
+      {
+          CurrentBlockchainStatus::circulating_supply_is_accurate = false;
+          CurrentBlockchainStatus::circulating_supply_calc_from_height = 0;
+      }
+      else
+      {
+          for (;locked_tx_end_timestamps_index < ARRAY_COUNT(locked_tx_end_timestamps);)
+          {
+              LockedAmounts const *locked_tx = locked_tx_end_timestamps + locked_tx_end_timestamps_index;
+              if (blk.timestamp >= locked_tx->time)
+              {
+                  ++locked_tx_end_timestamps_index;
+              }
+              else
+              {
+                  break;
+              }
+          }
+      }
     }
 
 
