@@ -24,6 +24,7 @@ CurrentBlockchainStatus::set_blockchain_variables(MicroCore* _mcore,
     core_storage =_core_storage;
 }
 
+#define ARRAY_COUNT(array) (sizeof(array)/sizeof(array[0]))
 static void update_circulating_supply()
 {
     uint64_t const curr_height = CurrentBlockchainStatus::core_storage->get_current_blockchain_height();
@@ -39,7 +40,6 @@ static void update_circulating_supply()
         CurrentBlockchainStatus::circulating_supply = DAY_0_CIRC_SUPPLY;
     }
 
-    uint64_t total_block_reward = 0;
     CurrentBlockchainStatus::circulating_supply_is_accurate = true;
     for (size_t height = start_height; height < curr_height; height++)
     {
@@ -72,16 +72,14 @@ static void update_circulating_supply()
         }
 
         uint64_t block_reward = (sum_money_in_outputs(blk.miner_tx) - fees) / 1000000000;
-        total_block_reward += block_reward;
+        CurrentBlockchainStatus::circulating_supply += block_reward;
     }
 
-    CurrentBlockchainStatus::circulating_supply += (total_block_reward);
     CurrentBlockchainStatus::circulating_supply_calc_from_height = curr_height;
 
     block latest_block;
     if (CurrentBlockchainStatus::mcore->get_block_by_height(curr_height - 1, latest_block))
     {
-#define ARRAY_COUNT(array) (sizeof(array) / sizeof(array[0]))
 #define DAY_TO_S(time)    (HOUR_TO_S(time) * 24ULL)
 #define HOUR_TO_S(time)   (MINUTE_TO_S(time) * 60ULL)
 #define MINUTE_TO_S(time) ((time) * 60ULL)
@@ -113,10 +111,16 @@ static void update_circulating_supply()
 
             CurrentBlockchainStatus::circulating_supply += locked_tx->amount;
         }
-#undef ARRAY_COUNT
 #undef DAY_TO_S
 #undef HOUR_TO_S
 #undef MINUTE_TO_S
+    }
+
+    FILE *circulating_supply_file = fopen("circulating_supply_cache.txt", "w+");
+    if (circulating_supply_file)
+    {
+      fprintf(circulating_supply_file, "%zu %zu", CurrentBlockchainStatus::circulating_supply_calc_from_height, CurrentBlockchainStatus::circulating_supply);
+      fclose(circulating_supply_file);
     }
 }
 
@@ -126,6 +130,25 @@ CurrentBlockchainStatus::start_monitor_blockchain_thread()
 {
     total_emission_atomic = Emission{};
     string emmision_saved_file = get_output_file_path().string();
+
+    FILE *circulating_supply_file = fopen("circulating_supply_cache.txt", "r");
+    if (circulating_supply_file)
+    {
+      char line[512];
+      line[0] = 0;
+
+      fgets(line, ARRAY_COUNT(line), circulating_supply_file);
+      CurrentBlockchainStatus::circulating_supply_calc_from_height = atoi(line);
+
+      char *line_ptr = line + 0;
+      while(line_ptr[0] && line_ptr[0] != ' ') line_ptr++;
+      line_ptr++;
+
+      CurrentBlockchainStatus::circulating_supply = atoi(line_ptr);
+      CurrentBlockchainStatus::circulating_supply_is_accurate = true;
+      fclose(circulating_supply_file);
+    }
+
 
     // read stored emission data if possible
     if (boost::filesystem::exists(emmision_saved_file))

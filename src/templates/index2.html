@@ -54,8 +54,11 @@
 
     {{#emission}}
         <p style="margin-top: 2px">
-            Circulating Supply: {{circulating_supply}} |
-            Loki emission (fees) is {{amount}} ({{fee_amount}}) as of {{blk_no}} block
+            Circulating Supply: {{circulating_supply}}
+            {{^circulating_supply_is_up_to_date}}
+            <span style="color:#ff6b62">(calculating)</span>
+            {{/circulating_supply_is_up_to_date}}
+            | Loki emission (fees) is {{amount}} ({{fee_amount}}) as of {{blk_no}} block
         </p>
     {{/emission}}
 </div>

@@ -1042,6 +1042,15 @@ public:
                     {"fee_amount"        , emission_fee},
                     {"circulating_supply", lokeg::make_comma_sep_number(CurrentBlockchainStatus::circulating_supply)}
             };
+
+            if (CurrentBlockchainStatus::circulating_supply_calc_from_height + 10 < core_storage->get_current_blockchain_height())
+            {
+              context.emplace("circulating_supply_is_up_to_date", false);
+            }
+            else
+            {
+              context.emplace("circulating_supply_is_up_to_date", true);
+            }
         }
         else
         {
