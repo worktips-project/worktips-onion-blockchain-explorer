@@ -664,18 +664,16 @@ public:
         mstch::array& quorum_array   = boost::get<mstch::array>(page_context["quorum_array"]);
         quorum_array.reserve(num_quorums_to_render);
 
-        uint64_t block_height = core_storage->get_current_blockchain_height() - 1;
-
         // NOTE: If we're on the homepage, only display the latest height being
         // voted for. This is not the latest height of the blockchain due to the
         // reorg safety buffer.
-        if (on_homepage && block_height >= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS)
+        uint64_t block_height = core_storage->get_current_blockchain_height() - 1;
+        if (on_homepage)
         {
-          block_height -= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS;
-        }
-        else
-        {
-          block_height = 0;
+          if (block_height >= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS)
+            block_height -= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS;
+          else
+            block_height = 0;
         }
 
         for (size_t height = block_height; num_quorums_to_render > 0; --num_quorums_to_render, --height)
@@ -685,10 +683,7 @@ public:
 
           // TODO(doyle): We should support querying batch quorums for perf
           COMMAND_RPC_GET_QUORUM_STATE::response response = {};
-          if (!rpc.get_quorum_state(response, height))
-          {
-            continue;
-          }
+          rpc.get_quorum_state(response, height);
 
           char const quorum_node_array_id[]       = "quorum_nodes_array";
           char const nodes_to_test_array_id[]     = "nodes_to_test_array";
@@ -697,7 +692,6 @@ public:
           quorum_part["quorum_nodes_array_size"]  = response.quorum_nodes.size();
           quorum_part["nodes_to_test_array_size"] = response.nodes_to_test.size();
 
-          // Split and sort the entries
           mstch::array& quorum_node_array   = boost::get<mstch::array>(quorum_part[quorum_node_array_id]);
           mstch::array& nodes_to_test_array = boost::get<mstch::array>(quorum_part[nodes_to_test_array_id]);
           quorum_node_array.reserve(response.quorum_nodes.size());
@@ -706,18 +700,20 @@ public:
           static const std::string failed_entry = "--";
           // TODO: refactor me pls
           {
-            COMMAND_RPC_GET_SERVICE_NODES::response sn_response;
-            bool inaccurate_or_failed_query = !rpc.get_service_node(sn_response, response.quorum_nodes);
-
-            if (sn_response.service_node_states.size() != response.quorum_nodes.size())
-              inaccurate_or_failed_query = true;
+            COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
+            rpc.get_service_node(sn_response, response.quorum_nodes);
 
             for (size_t i = 0; i < response.quorum_nodes.size(); ++i)
             {
               std::string const &pub_key = response.quorum_nodes[i];
               mstch::map array_entry { {"public_key", pub_key}, };
 
-              if (inaccurate_or_failed_query)
+              // TODO(doyle): Improve runtime complexity
+              auto it =  std::find_if(sn_response.service_node_states.begin(), sn_response.service_node_states.end(), [&pub_key](COMMAND_RPC_GET_SERVICE_NODES::response::entry const &a) -> bool {
+                  return a.service_node_pubkey == pub_key;
+              });
+
+              if (it == sn_response.service_node_states.end())
               {
                 array_entry.emplace("last_uptime_proof",        failed_entry);
                 array_entry.emplace("expiration_date",          failed_entry);
@@ -725,14 +721,12 @@ public:
               }
               else
               {
-                COMMAND_RPC_GET_SERVICE_NODES::response::entry const &entry = sn_response.service_node_states[i];
-
                 static std::string expiration_time_str;
-                time_t expiry_time = calculate_service_node_expiry_timestamp(entry.registration_height);
+                time_t expiry_time = calculate_service_node_expiry_timestamp(it->registration_height);
                 expiration_time_str.clear();
                 get_human_readable_timestamp(expiry_time, &expiration_time_str);
 
-                array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(entry.last_uptime_proof));
+                array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->last_uptime_proof));
                 array_entry.emplace("expiration_date",          expiration_time_str);
                 array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
               }
@@ -742,17 +736,18 @@ public:
 
           {
             COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
-            bool inaccurate_or_failed_query = !rpc.get_service_node(sn_response, response.nodes_to_test);
-
-            if (sn_response.service_node_states.size() != response.nodes_to_test.size())
-              inaccurate_or_failed_query = true;
+            rpc.get_service_node(sn_response, response.nodes_to_test);
 
             for (size_t i = 0; i < response.nodes_to_test.size(); ++i)
             {
               std::string const &pub_key = response.nodes_to_test[i];
               mstch::map array_entry { {"public_key", pub_key}, };
 
-              if (inaccurate_or_failed_query)
+              auto it =  std::find_if(sn_response.service_node_states.begin(), sn_response.service_node_states.end(), [&pub_key](COMMAND_RPC_GET_SERVICE_NODES::response::entry const &a) -> bool {
+                  return a.service_node_pubkey == pub_key;
+              });
+
+              if (it == sn_response.service_node_states.end())
               {
                 array_entry.emplace("last_uptime_proof",        failed_entry);
                 array_entry.emplace("expiration_date",          failed_entry);
@@ -760,14 +755,12 @@ public:
               }
               else
               {
-                COMMAND_RPC_GET_SERVICE_NODES::response::entry const &entry = sn_response.service_node_states[i];
-
                 static std::string expiration_time_str;
-                time_t expiry_time = calculate_service_node_expiry_timestamp(entry.registration_height);
+                time_t expiry_time = calculate_service_node_expiry_timestamp(it->registration_height);
                 expiration_time_str.clear();
                 get_human_readable_timestamp(expiry_time, &expiration_time_str);
 
-                array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(entry.last_uptime_proof));
+                array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->last_uptime_proof));
                 array_entry.emplace("expiration_date",          expiration_time_str);
                 array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
               }
