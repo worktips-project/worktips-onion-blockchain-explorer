@@ -665,6 +665,19 @@ public:
         quorum_array.reserve(num_quorums_to_render);
 
         uint64_t block_height = core_storage->get_current_blockchain_height() - 1;
+
+        // NOTE: If we're on the homepage, only display the latest height being
+        // voted for. This is not the latest height of the blockchain due to the
+        // reorg safety buffer.
+        if (on_homepage && block_height >= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS)
+        {
+          block_height -= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS;
+        }
+        else
+        {
+          block_height = 0;
+        }
+
         for (size_t height = block_height; num_quorums_to_render > 0; --num_quorums_to_render, --height)
         {
           mstch::map quorum_part;
