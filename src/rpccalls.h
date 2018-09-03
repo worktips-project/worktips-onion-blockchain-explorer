@@ -189,6 +189,8 @@ public:
     bool
     get_service_node(COMMAND_RPC_GET_SERVICE_NODES::response &res, const std::vector<std::string> &pubkeys);
 
+    bool
+    get_quorum_state(COMMAND_RPC_GET_QUORUM_STATE::response &res, uint64_t height);
 };
 
 
