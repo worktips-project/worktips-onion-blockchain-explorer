@@ -505,7 +505,7 @@ public:
     {
         uint64_t curr_height   = core_storage->get_current_blockchain_height();
         uint64_t expiry_height = registration_height;
-        expiry_height += (nettype == cryptonote::TESTNET) ? STAKING_REQUIREMENT_LOCK_BLOCKS_TESTNET : STAKING_REQUIREMENT_LOCK_BLOCKS;
+        expiry_height += service_nodes::get_staking_requirement_lock_blocks(nettype);
 
         int64_t delta_height = expiry_height - curr_height;
         time_t result = time(nullptr) + (delta_height * DIFFICULTY_TARGET_V2);

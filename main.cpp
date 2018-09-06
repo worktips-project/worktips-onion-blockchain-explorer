@@ -167,7 +167,7 @@ main(int ac, const char* av[])
     string daemon_url {*daemon_url_opt};
 
     if (testnet && daemon_url == "http:://127.0.0.1:22023")
-        daemon_url = "http:://127.0.0.1:38151";
+        daemon_url = "http:://127.0.0.1:38157";
     if (stagenet && daemon_url == "http:://127.0.0.1:22023")
         daemon_url = "http:://127.0.0.1:38154";
 
