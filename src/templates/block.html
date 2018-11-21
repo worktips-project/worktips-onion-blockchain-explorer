@@ -62,21 +62,19 @@
     <div class="TitleDivider"></div>
     {{#have_txs}}
         <table class="Table">
-            <tr class="TableHeader">
+            <tr>
                 <td>Hash</td>
                 <td>Outputs</td>
-                <td>Fee</td>
-                <td>Ring Size</td>
+                <td>Fee [&#181;&#x271]</td>
                 <td>In/Out</td>
                 <td>Size [kB]</td>
                 <td>Version</td>
             </tr>
             {{#blk_txs}}
                 <tr>
-                    <td><a href="/tx/{{hash}}">{{hash}}</a></td>
+                    <td><a href="/tx/{{hash}}">{{Hash}}</a></td>
                     <td>{{sum_outputs}}</td>
-                    <td>{{tx_fee}}</td>
-                    <td>{{mixin}}</td>
+                    <td>{{fee_micro}}</td>
                     <td>{{no_inputs}}/{{no_outputs}}</td>                    
                     <td>{{tx_size}}</td>
                     <td>{{version}}</td>
@@ -88,8 +86,8 @@
 
     {{#enable_as_hex}}
         <h5 style="margin-top:1px">
-            <a href="/blockhex/{{blk_height}}">Block as hex</a>
-            | <a href="/blockhexcomplete/{{blk_height}}">Complete block as hex</a>
+            <a href="/blockhex/{{blk_height}}">Block As Hex</a>
+            | <a href="/blockhexcomplete/{{blk_height}}">Complete Block As Hex</a>
         </h5>
     {{/enable_as_hex}}
 

@@ -38,7 +38,9 @@ struct MempoolStatus
         uint64_t mixin_no {0};
 
         string fee_str;
+        string fee_micro_str;
         string payed_for_kB_str;
+        string payed_for_kB_micro_str;
         string lok_inputs_str;
         string lok_outputs_str;
         string timestamp_str;

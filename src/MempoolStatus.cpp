@@ -110,11 +110,31 @@ MempoolStatus::read_mempool()
     // get txs in the mempool
     std::vector<tx_info> mempool_tx_info;
 
-    if (!rpc.get_mempool(mempool_tx_info))
+    //std::vector<tx_info> pool_tx_info;
+    std::vector<spent_key_image_info> pool_key_image_info;
+
+    // get txpool from lmdb database instead of rpc call
+    if (!mcore->get_mempool().get_transactions_and_spent_keys_info(
+                mempool_tx_info,
+                pool_key_image_info))
     {
         cerr << "Getting mempool failed " << endl;
         return false;
     }
+
+    (void) pool_key_image_info;
+
+    // sort txpool txs
+
+    // mempool txs are not sorted base on their arival time,
+    // so we sort it here.
+
+    std::sort(mempool_tx_info.begin(), mempool_tx_info.end(),
+    [](tx_info& t1, tx_info& t2)
+    {
+        return t1.receive_time > t2.receive_time;
+    });
+
 
     // if dont have tx_blob member, construct tx
     // from json obtained from the rpc call
@@ -156,7 +176,6 @@ MempoolStatus::read_mempool()
                tx, output_pub_keys, input_key_imgs);
 
 
-
         double tx_size =  static_cast<double>(_tx_info.blob_size)/1024.0;
 
         double payed_for_kB = LOK_AMOUNT(_tx_info.fee) / tx_size;
@@ -171,7 +190,9 @@ MempoolStatus::read_mempool()
         last_tx.num_nonrct_inputs = sum_data[3];
 
         last_tx.fee_str          = lokeg::lok_amount_to_str(_tx_info.fee, "{:0.4f}", false);
+        last_tx.fee_micro_str    = lokeg::lok_amount_to_str(_tx_info.fee*1.0e6, "{:04.0f}", false);
         last_tx.payed_for_kB_str = fmt::format("{:0.4f}", payed_for_kB);
+        last_tx.payed_for_kB_micro_str = fmt::format("{:04.0f}", payed_for_kB*1e6);
         last_tx.lok_inputs_str   = lokeg::lok_amount_to_str(last_tx.sum_inputs , "{:0.3f}");
         last_tx.lok_outputs_str  = lokeg::lok_amount_to_str(last_tx.sum_outputs, "{:0.3f}");
         last_tx.timestamp_str    = lokeg::timestamp_to_str_gm(_tx_info.receive_time);

@@ -40,12 +40,21 @@
 
 
     {{#network_info}}
+<<<<<<< HEAD
         <p style="margin-top: 5px; margin-bottom: 3">
             Network Difficulty: {{difficulty}}
             | Hard Fork: v{{current_hf_version}}
             | Hash Rate: {{hash_rate}}
             | Fee Per kB: {{fee_per_kb}}
             | Median Block Size Limit: {{block_size_limit}} kB
+=======
+        <h3 style="font-size: 12px; margin-top: 5px; margin-bottom: 3">
+            Network difficulty: {{difficulty}}
+            | Hard fork: v{{current_hf_version}}
+            | Hash rate: {{hash_rate}}
+            | Fee per byte: {{fee_per_kb}}
+            | Median block size limit: {{block_size_limit}} kB
+>>>>>>> upstream/master
             {{^is_current_info}}
             | Data From {{age}} {{age_format}} ago
             {{/is_current_info}}
@@ -65,6 +74,7 @@
 
     {{{mempool_info}}}
 
+<<<<<<< HEAD
     <div class="Wrapper">
         {{#is_page_zero}}
             <h2>Transactions In The Last {{no_of_last_blocks}} Blocks</h2>
@@ -115,6 +125,51 @@
          {{/is_page_zero}}
             <div class="PageButton">
                 Current Page: <a class="LinkNoUnderline" href="/">{{page_no}}</a>/<a class="LinkNoUnderline" href="/page/{{total_page_no}}">{{total_page_no}}</a>
+=======
+    {{#is_page_zero}}
+      <h2 style="margin-bottom: 0px">Transactions in the last {{no_of_last_blocks}} blocks</h2>
+    {{/is_page_zero}}
+    {{^is_page_zero}}
+      <h2 style="margin-bottom: 0px">Transactions in older blocks<!--(height: {{height}})--></h2>
+    {{/is_page_zero}}
+
+    <h4 style="font-size: 14px; margin-top: 0px">(Median size of 100 blocks: {{blk_size_median}} kB)</h4>
+
+    <div class="center">
+
+            <table class="center">
+                <tr>
+                    <td>height</td>
+                    <td>age {{age_format}}<!--(Δm)--></td>
+                    <td>size [kB]<!--(Δm)--></td>
+                    <td>transaction hash</td>
+                    <td>fee [&#181;&#x271]</td>
+                    <td>outputs</td>
+                    <td>in/out/pID</td>
+                    <td>tx size [kB]</td>
+                </tr>
+                {{#txs}}
+                <tr>
+                    <td><a href="/block/{{height}}">{{height}}</a></td>
+                    <td>{{age}}<!--{{time_delta}}--></td>
+                    <td>{{blk_size}}</td>
+                    <td><a href="/tx/{{hash}}">{{hash}}</a></td>
+                    <td>{{fee_micro}}</td>
+                    <td>{{sum_outputs_short}}</td>
+                    <td>{{no_inputs}}/{{no_outputs}}/{{pID}}</td>
+                    <td>{{tx_size_short}}</td>
+                </tr>
+                {{/txs}}
+            </table>
+
+            <div id="pages" class="center" style="text-align: center;">
+             {{^is_page_zero}}
+               <a href="/page/{{prev_page}}">previous page</a> |
+               <a href="/">first page</a> |
+             {{/is_page_zero}}
+                current page: {{page_no}}/<a href="/page/{{total_page_no}}">{{total_page_no}}</a>
+                | <a href="/page/{{next_page}}">next page</a>
+>>>>>>> upstream/master
             </div>
             <a class="LinkNoUnderline" href="/page/{{next_page}}">
                 <div class="PageButton">
