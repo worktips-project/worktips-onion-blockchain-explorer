@@ -1487,7 +1487,6 @@ public:
 
         // get block size in bytes
         uint64_t blk_size = core_storage->get_db().get_block_size(_blk_height);
-        uint64_t blk_diff = core_storage->get_db().get_block_difficulty(_blk_height);
 
         // miner reward tx
         transaction coinbase_tx = blk.miner_tx;
@@ -1505,9 +1504,8 @@ public:
                                                  _blk_height, current_blockchain_height);
 
         // initalise page tempate map with basic info about blockchain
-
         string blk_pow_hash_str = pod_to_hex(get_block_longhash(blk, _blk_height));
-        uint64_t blk_difficulty = core_storage->get_db().get_block_difficulty(_blk_height);
+        uint64_t blk_diff       = core_storage->get_db().get_block_difficulty(_blk_height);
 
         mstch::map context {
                 {"testnet"              , testnet},
@@ -1521,19 +1519,16 @@ public:
                 {"have_next_hash"       , have_next_hash},
                 {"have_prev_hash"       , have_prev_hash},
                 {"have_txs"             , have_txs},
-                {"no_txs"               , std::to_string(
-                        blk.tx_hashes.size())},
+                {"no_txs"               , std::to_string(blk.tx_hashes.size())},
                 {"blk_age"              , age.first},
                 {"delta_time"           , delta_time},
                 {"blk_nonce"            , blk.nonce},
                 {"blk_pow_hash"         , blk_pow_hash_str},
-                {"blk_difficulty"       , blk_difficulty},
+                {"blk_diff"             , blk_diff},
                 {"age_format"           , age.second},
                 {"major_ver"            , std::to_string(blk.major_version)},
                 {"minor_ver"            , std::to_string(blk.minor_version)},
-                {"blk_size"             , fmt::format("{:0.4f}",
-                                                      static_cast<double>(blk_size) / 1024.0)},
-                {"blk_diff"             , blk_diff}
+                {"blk_size"             , fmt::format("{:0.4f}", static_cast<double>(blk_size) / 1024.0)}
         };
         context.emplace("coinbase_txs", mstch::array{{txd_coinbase.get_mstch_map()}});
         context.emplace("blk_txs"     , mstch::array());
