@@ -1263,7 +1263,8 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
         context["emission"] = mstch::map {
                 {"blk_no"    , emission_blk_no},
                 {"amount"    , emission_coinbase},
-                {"fee_amount", emission_fee}
+                {"fee_amount", emission_fee},
+                {"circulating_supply", CurrentBlockchainStatus::circulating_supply}
         };
 
         if (CurrentBlockchainStatus::circulating_supply_calc_from_height + 10 < core_storage->get_current_blockchain_height())
