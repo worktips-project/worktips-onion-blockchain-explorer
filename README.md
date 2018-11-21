@@ -52,7 +52,7 @@ Current development branch:
 
 ## Compilation on Ubuntu 16.04/18.04
 
-##### Compile latest Loki development version
+##### Compile latest Loki master version
 
 Download and compile recent Loki into your home folder:
 
@@ -69,7 +69,7 @@ git clone --recursive https://github.com/loki-project/loki
 
 cd loki/
 
-make
+USE_SINGLE_BUILDDIR=1 make
 ```
 
 ##### Compile and run the explorer
@@ -649,7 +649,6 @@ curl  -w "\n" -X GET http://127.0.0.1:8081/api/outputsblocks?address=9sDyNU82ih1
 Example result:
 
 ```json
-{
 {
   "data": {
     "address": "0182d5be0f708cecf2b6f9889738bde5c930fad846d5b530e021afd1ae7e24a687ad50af3a5d38896655669079ad0163b4a369f6c852cc816dace5fc7792b72f",
