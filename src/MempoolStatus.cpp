@@ -130,8 +130,7 @@ MempoolStatus::read_mempool()
         crypto::hash tx_hash;
         crypto::hash tx_prefix_hash;
 
-        if (!parse_and_validate_tx_from_blob(
-                _tx_info.tx_blob, tx, tx_hash, tx_prefix_hash))
+        if (!parse_and_validate_tx_from_blob(_tx_info.tx_blob, tx, tx_hash, tx_prefix_hash))
         {
             cerr << "Cant make tx from _tx_info.tx_blob" << endl;
             return false;
@@ -168,7 +167,7 @@ MempoolStatus::read_mempool()
         last_tx.mixin_no          = sum_data[2];
         last_tx.num_nonrct_inputs = sum_data[3];
 
-        last_tx.fee_str          = lokeg::lok_amount_to_str(_tx_info.fee, "{:0.3f}", false);
+        last_tx.fee_str          = lokeg::lok_amount_to_str(_tx_info.fee, "{:0.4f}", false);
         last_tx.payed_for_kB_str = fmt::format("{:0.4f}", payed_for_kB);
         last_tx.lok_inputs_str   = lokeg::lok_amount_to_str(last_tx.sum_inputs , "{:0.3f}");
         last_tx.lok_outputs_str  = lokeg::lok_amount_to_str(last_tx.sum_outputs, "{:0.3f}");

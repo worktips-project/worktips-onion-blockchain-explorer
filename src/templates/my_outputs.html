@@ -139,7 +139,7 @@
             {{/inputs}}
 
         </div>
-        <p>
+        <h3>
             Sum LOK from matched and marked by * ring member's outputs: {{sum_mixin_lok}}
             <br/>
             <span> Possible spending is:
@@ -150,7 +150,13 @@
                 it is impossible to know whether this is your real spending. <br/>
                 So do not take this number seriously.
                 It is probably totally wrong anyway.</span>
-        </p>
+               <br/>
+               <span style="font-size: 14px">
+                 Number of possible our mixins is {{no_all_possible_mixins}}
+                      for {{all_possible_mixins_amount}} lok
+                      (amount as uint64).
+               </span>
+        </h3>
     </div>
 
     {{/show_inputs}}

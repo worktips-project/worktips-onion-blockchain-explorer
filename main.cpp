@@ -44,6 +44,7 @@ main(int ac, const char* av[])
     }
 
     auto port_opt                      = opts.get_option<string>("port");
+    auto bindaddr_opt                  = opts.get_option<string>("bindaddr");
     auto bc_path_opt                   = opts.get_option<string>("bc-path");
     auto daemon_url_opt                = opts.get_option<string>("daemon-url");
     auto ssl_crt_file_opt              = opts.get_option<string>("ssl-crt-file");
@@ -63,6 +64,7 @@ main(int ac, const char* av[])
     auto enable_js_opt                 = opts.get_option<bool>("enable-js");
     auto enable_mixin_details_opt      = opts.get_option<bool>("enable-mixin-details");
     auto enable_json_api_opt           = opts.get_option<bool>("enable-json-api");
+    auto enable_as_hex_opt             = opts.get_option<bool>("enable-as-hex");
     auto enable_tx_cache_opt           = opts.get_option<bool>("enable-tx-cache");
     auto enable_block_cache_opt        = opts.get_option<bool>("enable-block-cache");
     auto show_cache_times_opt          = opts.get_option<bool>("show-cache-times");
@@ -90,6 +92,7 @@ main(int ac, const char* av[])
     bool enable_output_key_checker    {*enable_output_key_checker_opt};
     bool enable_mixin_details         {*enable_mixin_details_opt};
     bool enable_json_api              {*enable_json_api_opt};
+    bool enable_as_hex                {*enable_as_hex_opt};
     bool enable_tx_cache              {*enable_tx_cache_opt};
     bool enable_block_cache           {*enable_block_cache_opt};
     bool enable_emission_monitor      {*enable_emission_monitor_opt};
@@ -100,8 +103,12 @@ main(int ac, const char* av[])
     uint32_t log_level = 0;
     mlog_configure("", true);
 
+    (void) log_level;
+
     //cast port number in string to uint
     uint16_t app_port = boost::lexical_cast<uint16_t>(*port_opt);
+
+    string bindaddr = *bindaddr_opt;
 
     // cast no_blocks_on_index_opt to uint
     uint64_t no_blocks_on_index = boost::lexical_cast<uint64_t>(*no_blocks_on_index_opt);
@@ -259,6 +266,7 @@ main(int ac, const char* av[])
                           nettype,
                           enable_pusher,
                           enable_js,
+                          enable_as_hex,
                           enable_key_image_checker,
                           enable_output_key_checker,
                           enable_autorefresh_option,
@@ -305,6 +313,29 @@ main(int ac, const char* av[])
     ([&](const crow::request& req, string tx_hash) {
         return crow::response(lokblocks.show_tx(remove_bad_chars(tx_hash)));
     });
+
+    if (enable_as_hex)
+    {
+        CROW_ROUTE(app, "/txhex/<string>")
+        ([&](string tx_hash) {
+            return crow::response(lokblocks.show_tx_hex(remove_bad_chars(tx_hash)));
+        });
+
+        CROW_ROUTE(app, "/ringmembershex/<string>")
+        ([&](string tx_hash) {
+            return crow::response(lokblocks.show_ringmembers_hex(remove_bad_chars(tx_hash)));
+        });
+
+        CROW_ROUTE(app, "/blockhex/<uint>")
+        ([&](size_t block_height) {
+            return crow::response(lokblocks.show_block_hex(block_height, false));
+        });
+
+        CROW_ROUTE(app, "/blockhexcomplete/<uint>")
+        ([&](size_t block_height) {
+            return crow::response(lokblocks.show_block_hex(block_height, true));
+        });
+    }
 
     CROW_ROUTE(app, "/tx/<string>/<uint>")
     ([&](string tx_hash, uint16_t with_ring_signatures)
@@ -593,7 +624,7 @@ main(int ac, const char* av[])
         });
 
         CROW_ROUTE(app, "/js/all_in_one.js")
-        ([&](const crow::request& req) {
+        ([&]() {
             // /js/all_in_one.js file does not exist. it is generated on the fly
             // from the above real files.
             return lokblocks.get_js_file("all_in_one.js");
@@ -607,7 +638,7 @@ main(int ac, const char* av[])
         cout << "Enable JSON API\n";
 
         CROW_ROUTE(app, "/api/transaction/<string>")
-        ([&](const crow::request &req, string tx_hash) {
+        ([&](string tx_hash) {
 
             mylok::jsonresponse r{lokblocks.json_transaction(remove_bad_chars(tx_hash))};
 
@@ -615,15 +646,23 @@ main(int ac, const char* av[])
         });
 
         CROW_ROUTE(app, "/api/rawtransaction/<string>")
-        ([&](const crow::request &req, string tx_hash) {
+        ([&](string tx_hash) {
 
             mylok::jsonresponse r{lokblocks.json_rawtransaction(remove_bad_chars(tx_hash))};
 
             return r;
         });
 
+        CROW_ROUTE(app, "/api/detailedtransaction/<string>")
+        ([&](string tx_hash) {
+
+            mylok::jsonresponse r{lokblocks.json_detailedtransaction(remove_bad_chars(tx_hash))};
+
+            return r;
+        });
+
         CROW_ROUTE(app, "/api/block/<string>")
-        ([&](const crow::request &req, string block_no_or_hash) {
+        ([&](string block_no_or_hash) {
 
             mylok::jsonresponse r{lokblocks.json_block(remove_bad_chars(block_no_or_hash))};
 
@@ -631,7 +670,7 @@ main(int ac, const char* av[])
         });
 
         CROW_ROUTE(app, "/api/rawblock/<string>")
-        ([&](const crow::request &req, string block_no_or_hash) {
+        ([&](string block_no_or_hash) {
 
             mylok::jsonresponse r{lokblocks.json_rawblock(remove_bad_chars(block_no_or_hash))};
 
@@ -672,7 +711,7 @@ main(int ac, const char* av[])
         });
 
         CROW_ROUTE(app, "/api/search/<string>")
-        ([&](const crow::request &req, string search_value) {
+        ([&](string search_value) {
 
             mylok::jsonresponse r{lokblocks.json_search(remove_bad_chars(search_value))};
 
@@ -680,7 +719,7 @@ main(int ac, const char* av[])
         });
 
         CROW_ROUTE(app, "/api/networkinfo")
-        ([&](const crow::request &req) {
+        ([&]() {
 
             mylok::jsonresponse r{lokblocks.json_networkinfo()};
 
@@ -688,7 +727,7 @@ main(int ac, const char* av[])
         });
 
         CROW_ROUTE(app, "/api/emission")
-        ([&](const crow::request &req) {
+        ([&]() {
 
             mylok::jsonresponse r{lokblocks.json_emission()};
 
@@ -764,7 +803,7 @@ main(int ac, const char* av[])
         });
 
         CROW_ROUTE(app, "/api/version")
-        ([&](const crow::request &req) {
+        ([&]() {
 
             mylok::jsonresponse r{lokblocks.json_version()};
 
@@ -788,13 +827,13 @@ main(int ac, const char* av[])
     if (use_ssl)
     {
         cout << "Staring in ssl mode" << endl;
-        app.port(app_port).ssl_file(ssl_crt_file, ssl_key_file)
+        app.bindaddr(bindaddr).port(app_port).ssl_file(ssl_crt_file, ssl_key_file)
                 .multithreaded().run();
     }
     else
     {
         cout << "Staring in non-ssl mode" << endl;
-        app.port(app_port).multithreaded().run();
+        app.bindaddr(bindaddr).port(app_port).multithreaded().run();
     }
 
 

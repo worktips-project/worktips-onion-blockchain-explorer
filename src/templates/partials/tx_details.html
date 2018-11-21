@@ -576,7 +576,13 @@
     <div style="height: 1em;"></div>
     {{^with_ring_signatures}}
         {{#show_more_details_link}}
-            <p style="margin-top:1px"><a href="/tx/{{tx_hash}}/1">More Details</a></p>
+            <h5 style="margin-top:1px">
+                <a href="/tx/{{tx_hash}}/1">More Details</a>
+                {{#enable_as_hex}}
+                    | <a href="/txhex/{{tx_hash}}">TX As Hex</a>
+                    | <a href="/ringmembershex/{{tx_hash}}">TX Ring Members As Hex</a>
+                {{/enable_as_hex}}
+            </h5>
         {{/show_more_details_link}}
     {{/with_ring_signatures}}
 
