@@ -418,7 +418,7 @@ rpccalls::get_service_node(COMMAND_RPC_GET_SERVICE_NODES::response &res, const s
     request.params.service_node_pubkeys = pubkeys;
     request.jsonrpc = "2.0";
     request.id      = epee::serialization::storage_entry(0);
-    request.method  = "get_service_nodes";
+    request.method  = pubkeys.empty() ? "get_all_service_nodes" : "get_service_nodes";
 
     result = epee::net_utils::invoke_http_json("/json_rpc", request, response, m_http_client, timeout_time_ms);
 
@@ -446,6 +446,33 @@ rpccalls::get_quorum_state(COMMAND_RPC_GET_QUORUM_STATE::response &res, uint64_t
     request.jsonrpc = "2.0";
     request.id      = epee::serialization::storage_entry(0);
     request.method  = "get_quorum_state";
+
+    result = epee::net_utils::invoke_http_json("/json_rpc", request, response, m_http_client, timeout_time_ms);
+    if (!result)
+        cerr << "Error connecting to Loki daemon at " << daemon_url << endl;
+
+    res = response.result;
+    return result;
+}
+
+bool
+rpccalls::get_quorum_state_batched(COMMAND_RPC_GET_QUORUM_STATE_BATCHED::response &res, uint64_t height_begin, uint64_t height_end)
+{
+    std::lock_guard<std::mutex> guard(m_daemon_rpc_mutex);
+    bool result = false;
+    if (!connect_to_loki_daemon())
+    {
+        cerr << "rpccalls::get_quorum_state_batched: not connected to daemon" << endl;
+        return result;
+    }
+
+    epee::json_rpc::request<COMMAND_RPC_GET_QUORUM_STATE_BATCHED::request> request;
+    epee::json_rpc::response<COMMAND_RPC_GET_QUORUM_STATE_BATCHED::response, std::string> response;
+    request.params.height_begin = height_begin;
+    request.params.height_end = height_end;
+    request.jsonrpc = "2.0";
+    request.id      = epee::serialization::storage_entry(0);
+    request.method  = "get_quorum_state_batched";
 
     result = epee::net_utils::invoke_http_json("/json_rpc", request, response, m_http_client, timeout_time_ms);
     if (!result)
