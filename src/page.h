@@ -1217,19 +1217,20 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
     }
 
     context["network_info"] = mstch::map {
-            {"difficulty"        , lokeg::make_comma_sep_number(current_network_info.difficulty)},
-            {"hash_rate"         , hash_rate},
-            {"fee_per_kb"        , print_money(current_network_info.fee_per_kb)},
-            {"alt_blocks_no"     , current_network_info.alt_blocks_count},
-            {"have_alt_block"    , (current_network_info.alt_blocks_count > 0)},
-            {"tx_pool_size"      , current_network_info.tx_pool_size},
-            {"block_size_limit"  , string {current_network_info.block_size_limit_str}},
-            {"block_size_median" , string {current_network_info.block_size_median_str}},
-            {"is_current_info"   , current_network_info.current},
-            {"is_pool_size_zero" , (current_network_info.tx_pool_size == 0)},
-            {"current_hf_version", current_network_info.current_hf_version},
-            {"age"               , network_info_age.first},
-            {"age_format"        , network_info_age.second},
+            {"difficulty"         , lokeg::make_comma_sep_number(current_network_info.difficulty)},
+            {"hash_rate"          , hash_rate},
+            {"fee_per_kb"         , print_money(current_network_info.fee_per_kb)},
+            {"alt_blocks_no"      , current_network_info.alt_blocks_count},
+            {"have_alt_block"     , (current_network_info.alt_blocks_count > 0)},
+            {"tx_pool_size"       , current_network_info.tx_pool_size},
+            {"block_size_limit"   , string {current_network_info.block_size_limit_str}},
+            {"block_size_median"  , string {current_network_info.block_size_median_str}},
+            {"is_current_info"    , current_network_info.current},
+            {"is_pool_size_zero"  , (current_network_info.tx_pool_size == 0)},
+            {"current_hf_version" , current_network_info.current_hf_version},
+            {"staking_requirement", print_money(current_network_info.staking_requirement)},
+            {"age"                , network_info_age.first},
+            {"age_format"         , network_info_age.second},
     };
 
     // median size of 100 blocks
@@ -5970,9 +5971,10 @@ json_emission()
         string emission_fee      = lok_amount_to_str(current_values.fee, "{:0.4f}", false);
 
         j_data = json {
-                {"blk_no"  , current_values.blk_no - 1},
-                {"coinbase", current_values.coinbase},
-                {"fee"     , current_values.fee},
+                {"blk_no"  ,           current_values.blk_no - 1},
+                {"coinbase",           current_values.coinbase},
+                {"fee"     ,           current_values.fee},
+                {"circulating_supply", CurrentBlockchainStatus::circulating_supply},
         };
     }
 
