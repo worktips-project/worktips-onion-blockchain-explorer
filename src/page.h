@@ -587,6 +587,7 @@ time_t calculate_service_node_expiry_timestamp(uint64_t registration_height)
 
     int64_t delta_height = expiry_height - curr_height;
     time_t result = time(nullptr) + (delta_height * DIFFICULTY_TARGET_V2);
+    return result;
 }
 
 void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::vector<COMMAND_RPC_GET_SERVICE_NODES::response::entry *> const *entries)
