@@ -6,6 +6,7 @@
 #include "ext/crow/crow.h"
 #include "src/CmdLineOptions.h"
 #include "src/MicroCore.h"
+#include "src/CurrentBlockchainStatus.h"
 
 #include <fstream>
 #include <regex>
@@ -730,8 +731,12 @@ main(int ac, const char* av[])
         ([&]() {
 
             mylok::jsonresponse r{lokblocks.json_emission()};
-
             return r;
+        });
+
+        CROW_ROUTE(app, "/api/circulating_supply") ([&]() {
+            std::string result = std::to_string(lokeg::CurrentBlockchainStatus::circulating_supply);
+            return std::move(result);
         });
 
         CROW_ROUTE(app, "/api/outputs").methods("GET"_method)
