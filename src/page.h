@@ -698,8 +698,8 @@ render_service_nodes_html(bool add_header_and_footer)
     mstch::array& awaiting_array = boost::get<mstch::array>(page_context[awaiting_array_id]);
     generate_service_node_mapping(&awaiting_array, on_homepage, &unregistered);
     generate_service_node_mapping(&active_array, on_homepage, &registered);
-    page_context["service_node_active_size"]   = registered.size();
-    page_context["service_node_awaiting_size"] = unregistered.size();
+    page_context["service_node_active_size"]   = (int) registered.size();
+    page_context["service_node_awaiting_size"] = (int) unregistered.size();
 
     if (on_homepage)
     {
@@ -758,7 +758,7 @@ render_quorum_states_html(bool add_header_and_footer)
     for (size_t height = block_height; num_quorums_to_render > 0; --num_quorums_to_render, --height)
     {
       mstch::map quorum_part;
-      quorum_part["quorum_height"] = height;
+      quorum_part["quorum_height"] = (uint64_t) height;
 
       // TODO(doyle): We should support querying batch quorums for perf
       COMMAND_RPC_GET_QUORUM_STATE::response response = {};
@@ -768,8 +768,8 @@ render_quorum_states_html(bool add_header_and_footer)
       char const nodes_to_test_array_id[]     = "nodes_to_test_array";
       quorum_part[quorum_node_array_id]       = mstch::array();
       quorum_part[nodes_to_test_array_id]     = mstch::array();
-      quorum_part["quorum_nodes_array_size"]  = response.quorum_nodes.size();
-      quorum_part["nodes_to_test_array_size"] = response.nodes_to_test.size();
+      quorum_part["quorum_nodes_array_size"]  = (int) response.quorum_nodes.size();
+      quorum_part["nodes_to_test_array_size"] = (int) response.nodes_to_test.size();
 
       mstch::array& quorum_node_array   = boost::get<mstch::array>(quorum_part[quorum_node_array_id]);
       mstch::array& nodes_to_test_array = boost::get<mstch::array>(quorum_part[nodes_to_test_array_id]);
@@ -1716,7 +1716,7 @@ show_service_node(const std::string &service_node_pubkey)
     page_context["operator_address"]     = entry->operator_address;
     page_context["operator_address"]     = entry->operator_address;
     page_context["last_uptime_proof"]    = (entry->last_uptime_proof == 0) ? friendly_uptime_proof_not_received : get_age(server_timestamp, entry->last_uptime_proof).first;
-    page_context["num_contributors"]     = entry->contributors.size();
+    page_context["num_contributors"]     = (int) entry->contributors.size();
     page_context["register_height"]      = entry->registration_height;
 
     // Make contributor render data
