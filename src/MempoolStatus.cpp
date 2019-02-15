@@ -294,7 +294,7 @@ MempoolStatus::read_network_info()
     local_copy.block_weight_limit         = rpc_network_info.block_weight_limit;
     local_copy.start_time                 = rpc_network_info.start_time;
     local_copy.staking_requirement        = staking_requirement.staking_requirement;
-
+    local_copy.total_blockchain_size      = rpc_network_info.database_size;
 
     strncpy(local_copy.block_size_limit_str, fmt::format("{:0.2f}",
                                              static_cast<double>(
@@ -306,6 +306,11 @@ MempoolStatus::read_network_info()
                                               static_cast<double>(
                                               local_copy.block_size_median) / 1024.0).c_str(),
                                               sizeof(local_copy.block_size_median_str));
+                                              
+    strncpy(local_copy.total_blockchain_size_str, fmt::format("{:0.2f}",
+                                                  static_cast<double>(
+                                                  local_copy.total_blockchain_size) / 1024.0 / 1024.0 / 1024.0).c_str(),
+                                                  sizeof(local_copy.total_blockchain_size_str));                                                
 
     epee::string_tools::hex_to_pod(rpc_network_info.top_block_hash,
                                    local_copy.top_block_hash);
