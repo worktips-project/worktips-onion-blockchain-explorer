@@ -71,7 +71,7 @@ endif()
 include_directories(${Boost_INCLUDE_DIRS})
 
 # include monero
-include_directories(${MONERO_SOURCE_DIR}/build)
+include_directories(${LOKI_SOURCE_DIR}/build)
 
 include_directories("ext/mstch/include")
 include_directories("ext/mstch/include/src")
