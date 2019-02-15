@@ -6719,7 +6719,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
     {
         tx_extra_service_node_deregister deregister;
         tx_extra_service_node_register   register_;
-        if (tx.is_deregister)
+        if (tx.get_type() == cryptonote::transaction::type_deregister)
         {
             context["have_deregister_info"] = true;
             if (get_service_node_deregister_from_tx_extra(tx.extra, deregister))
