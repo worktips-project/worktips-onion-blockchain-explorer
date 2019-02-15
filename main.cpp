@@ -238,6 +238,7 @@ main(int ac, const char* av[])
     lokeg::MempoolStatus::network_info initial_info;
     strcpy(initial_info.block_size_limit_str, "0.0");
     strcpy(initial_info.block_size_median_str, "0.0");
+    strcpy(initial_info.total_blockchain_size_str, "0.0");
     lokeg::MempoolStatus::current_network_info = initial_info;
 
     try
@@ -258,7 +259,7 @@ main(int ac, const char* av[])
     // when they log back or create new account.
     lokeg::MempoolStatus::mempool_refresh_time = mempool_refresh_time;
     lokeg::MempoolStatus::start_mempool_status_thread();
-
+ 
     // create instance of page class which
     // contains logic for the website
     lokeg::page lokblocks(&mcore,

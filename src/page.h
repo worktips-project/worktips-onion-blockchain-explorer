@@ -1235,6 +1235,7 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
             {"staking_requirement", print_money(current_network_info.staking_requirement)},
             {"age"                , network_info_age.first},
             {"age_format"         , network_info_age.second},
+            {"total_blockchain_size" , string {current_network_info.total_blockchain_size_str}},
     };
 
     // median size of 100 blocks
@@ -7456,7 +7457,8 @@ get_loki_network_info(json& j_info)
        {"block_size_median"         , local_copy_network_info.block_size_median},
        {"start_time"                , local_copy_network_info.start_time},
        {"fee_per_kb"                , local_copy_network_info.fee_per_kb},
-       {"current_hf_version"        , local_copy_network_info.current_hf_version}
+       {"current_hf_version"        , local_copy_network_info.current_hf_version},
+       {"total_blockchain_size"     , local_copy_network_info.total_blockchain_size}
     };
 
     return local_copy_network_info.current;
