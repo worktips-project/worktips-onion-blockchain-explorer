@@ -586,7 +586,7 @@ time_t calculate_service_node_expiry_timestamp(uint64_t registration_height)
 {
     uint64_t curr_height   = core_storage->get_current_blockchain_height();
     uint64_t expiry_height = registration_height;
-    expiry_height += service_nodes::get_staking_requirement_lock_blocks(nettype);
+    expiry_height += service_nodes::staking_num_lock_blocks(nettype);
 
     int64_t delta_height = expiry_height - curr_height;
     time_t result = time(nullptr) + (delta_height * DIFFICULTY_TARGET_V2);
@@ -1726,7 +1726,7 @@ show_service_node(const std::string &service_node_pubkey)
     char const service_node_contributors_array_id[] = "service_node_contributors_array";
     page_context.emplace(service_node_contributors_array_id, mstch::array{});
     mstch::array& contributors = boost::get<mstch::array>(page_context[service_node_contributors_array_id]);
-    for (COMMAND_RPC_GET_SERVICE_NODES::response::contribution const &contributor : entry->contributors)
+    for (COMMAND_RPC_GET_SERVICE_NODES::response::contributor const &contributor : entry->contributors)
     {
       mstch::map array_entry
       {
@@ -2170,9 +2170,6 @@ show_ringmembers_hex(string const& tx_hash_str)
     archive << all_mixin_outputs;
 
     // return as all_mixin_outputs vector hex
-<<<<<<< HEAD
-    return epee::string_tools::buff_to_hex_nodelimer(oss.str());
-=======
     return epee::string_tools
             ::buff_to_hex_nodelimer(oss.str());
 }
@@ -2186,7 +2183,7 @@ show_ringmemberstx_hex(string const& tx_hash_str)
     if (!get_tx(tx_hash_str, tx, tx_hash))
         return string {"Cant get tx: "} +  tx_hash_str;
 
-    vector<txin_to_key> input_key_imgs = xmreg::get_key_images(tx);
+    vector<txin_to_key> input_key_imgs = lokeg::get_key_images(tx);
 
     // key: constracted from concatenation of in_key.amount and absolute_offsets,
     // value: vector of string where string is transaction hash + output index + tx_hex
@@ -2236,7 +2233,6 @@ show_ringmemberstx_hex(string const& tx_hash_str)
         {
            auto const& mixin_tx_hash = txi.first;
            auto const& output_index_in_tx = txi.second;
->>>>>>> 12f54797421b03b76516438b8fd0279cd94c964e
 
            transaction mixin_tx;
 
@@ -2290,7 +2286,7 @@ show_ringmemberstx_jsonhex(string const& tx_hash_str)
     if (!get_tx(tx_hash_str, tx, tx_hash))
         return string {"Cant get tx: "} +  tx_hash_str;
 
-    vector<txin_to_key> input_key_imgs = xmreg::get_key_images(tx);
+    vector<txin_to_key> input_key_imgs = lokeg::get_key_images(tx);
 
     json tx_json;
 
@@ -3447,7 +3443,7 @@ show_checkrawtx(string raw_tx_data, string action)
 
                 mstch::map tx_cd_data {
                         {"no_of_sources"      , static_cast<uint64_t>(no_of_sources)},
-                        {"use_rct"            , tx_cd.use_rct},
+                        {"use_rct"            , tx_cd.v2_use_rct},
                         {"change_amount"      , lokeg::lok_amount_to_str(tx_change.amount)},
                         {"has_payment_id"     , (payment_id  != null_hash)},
                         {"has_payment_id8"    , (payment_id8 != null_hash8)},
@@ -6723,7 +6719,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
     {
         tx_extra_service_node_deregister deregister;
         tx_extra_service_node_register   register_;
-        if (tx.is_deregister_tx())
+        if (tx.is_deregister)
         {
             context["have_deregister_info"] = true;
             if (get_service_node_deregister_from_tx_extra(tx.extra, deregister))

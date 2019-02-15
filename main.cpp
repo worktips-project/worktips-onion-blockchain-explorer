@@ -344,7 +344,7 @@ main(int ac, const char* av[])
 
         CROW_ROUTE(app, "/ringmemberstxhex/<string>")
         ([&](string tx_hash) {
-            return myxmr::jsonresponse {xmrblocks.show_ringmemberstx_jsonhex(remove_bad_chars(tx_hash))};
+            return mylok::jsonresponse {lokblocks.show_ringmemberstx_jsonhex(remove_bad_chars(tx_hash))};
         });
 
     }
