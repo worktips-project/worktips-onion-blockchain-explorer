@@ -619,7 +619,19 @@ void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::v
         static std::string expiration_time_str;
         time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
         expiration_time_str.clear();
-        get_human_readable_timestamp(expiry_time, &expiration_time_str);
+        std::string expiration_time_relative;        
+        
+        if (expiry_time > 0) 
+        {
+          get_human_readable_timestamp(expiry_time, &expiration_time_str);
+          expiration_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
+        }
+        else 
+        {
+          expiration_time_str = "Infinitely Staking";
+        }
+        
+        if()
 
         mstch::map array_entry
         {
@@ -633,7 +645,7 @@ void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::v
           {"last_reward_at_block",          entry->last_reward_block_height},
           {"last_reward_at_block_tx_index", (entry->last_reward_transaction_index == UINT32_MAX) ? end_of_queue : std::to_string(entry->last_reward_transaction_index)},
           {"expiration_date",               expiration_time_str},
-          {"expiration_time_relative",      std::string(get_human_time_ago(expiry_time, time(nullptr)))},
+          {"expiration_time_relative",      expiration_time_relative},
           {"last_uptime_proof",             last_uptime_proof_to_string(entry->last_uptime_proof)},
         };
         array->push_back(array_entry);
