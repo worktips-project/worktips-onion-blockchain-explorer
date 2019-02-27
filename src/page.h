@@ -595,16 +595,14 @@ time_t calculate_service_node_expiry_timestamp(uint64_t registration_height)
 
 void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::vector<COMMAND_RPC_GET_SERVICE_NODES::response::entry *> const *entries)
 {
-    static std::string num_contributors_str;
-    num_contributors_str.reserve(8);
-
     static std::string end_of_queue = "End Of Queue";
-
     size_t iterate_count = on_homepage ? snode_context.num_entries_on_front_page : entries->size();
     iterate_count        = std::min(entries->size(), iterate_count);
 
     array->reserve(iterate_count);
 
+    static std::string num_contributors_str;
+    num_contributors_str.reserve(8);
     for (size_t i = 0; i < iterate_count; ++i, num_contributors_str.clear())
     {
         COMMAND_RPC_GET_SERVICE_NODES::response::entry const *entry = (*entries)[i];
@@ -615,23 +613,26 @@ void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::v
         uint64_t contribution_remaining = entry->staking_requirement - entry->total_reserved;
         int operator_cut_in_percent = portions_to_percent(entry->portions_for_operator);
 
-        // Calculate the estimated expiration time
-        static std::string expiration_time_str;
-        time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
-        expiration_time_str.clear();
-        std::string expiration_time_relative;        
-        
-        if (expiry_time > 0) 
+        std::string expiration_time_relative;
+        std::string expiration_time_str;
+        uint64_t expiry_height = 0;
+
+        if (entry->contributors[0].locked_contributions.size() > 0)
+          expiry_height = entry->requested_unlock_height;
+        else
+          expiry_height = entry->registration_height + service_nodes::staking_num_lock_blocks(nettype);
+
+        if (expiry_height > 0)
         {
+          time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
           get_human_readable_timestamp(expiry_time, &expiration_time_str);
           expiration_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
         }
-        else 
+        else
         {
-          expiration_time_str = "Infinitely Staking";
+          expiration_time_relative = "N/A";
+          expiration_time_str = "Staking Infinitely";
         }
-        
-        if()
 
         mstch::map array_entry
         {
@@ -763,14 +764,30 @@ void gather_sn_data(const std::vector<std::string>& nodes, const sn_entry_map& s
         }
         else
         {
-            static std::string expiration_time_str;
-            time_t expiry_time = calculate_service_node_expiry_timestamp(it->second.registration_height);
-            expiration_time_str.clear();
-            get_human_readable_timestamp(expiry_time, &expiration_time_str);
+            std::string expiration_time_relative;
+            std::string expiration_time_str;
+
+            uint64_t expiry_height = 0;
+            if (it->second.contributors[0].locked_contributions.size() > 0)
+              expiry_height = it->second.requested_unlock_height;
+            else
+              expiry_height = it->second.registration_height + service_nodes::staking_num_lock_blocks(nettype);
+
+            if (expiry_height > 0)
+            {
+              time_t expiry_time = calculate_service_node_expiry_timestamp(it->second.registration_height);
+              get_human_readable_timestamp(expiry_time, &expiration_time_str);
+              expiration_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
+            }
+            else
+            {
+              expiration_time_relative = "N/A";
+              expiration_time_str = "Staking Infinitely";
+            }
 
             array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->second.last_uptime_proof));
             array_entry.emplace("expiration_date",          expiration_time_str);
-            array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
+            array_entry.emplace("expiration_time_relative", expiration_time_relative);
         }
         array.push_back(array_entry);
     }
@@ -805,7 +822,7 @@ render_quorum_states_html(bool add_header_and_footer)
     }
 
     COMMAND_RPC_GET_QUORUM_STATE_BATCHED::response batched_response = {};
-    rpc.get_quorum_state_batched(batched_response, block_height - num_quorums_to_render, block_height)
+    rpc.get_quorum_state_batched(batched_response, block_height - num_quorums_to_render, block_height);
 
     COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
     rpc.get_service_node(sn_response, {});
@@ -817,8 +834,10 @@ render_quorum_states_html(bool add_header_and_footer)
         pk2sninfo.insert({entry.service_node_pubkey, entry});
     }
 
-    for (const auto& entry : batched_response.quorum_entries)
+    // TODO(doyle): Use std::min as workaround, sigh ... the person who wrote this bit did not test the code ..
+    for (int i = 0; i < std::min(num_quorums_to_render, batched_response.quorum_entries.size()); ++i)
     {
+        const auto& entry = batched_response.quorum_entries[i];
         const uint64_t height = entry.height;
 
         mstch::map quorum_part;
