@@ -743,6 +743,40 @@ std::string last_uptime_proof_to_string(time_t uptime_proof)
   }
 }
 
+using sn_entry_map = std::unordered_map<std::string, COMMAND_RPC_GET_SERVICE_NODES::response::entry>;
+
+void gather_sn_data(const std::vector<std::string>& nodes, const sn_entry_map& sn_map, mstch::array& array)
+{
+    static const std::string failed_entry = "--";
+
+    for (const std::string& pub_key : nodes)
+    {
+        mstch::map array_entry { {"public_key", pub_key}, };
+
+        auto it = sn_map.find(pub_key);
+
+        if (it == sn_map.end())
+        {
+            array_entry.emplace("last_uptime_proof",        failed_entry);
+            array_entry.emplace("expiration_date",          failed_entry);
+            array_entry.emplace("expiration_time_relative", failed_entry);
+        }
+        else
+        {
+            static std::string expiration_time_str;
+            time_t expiry_time = calculate_service_node_expiry_timestamp(it->second.registration_height);
+            expiration_time_str.clear();
+            get_human_readable_timestamp(expiry_time, &expiration_time_str);
+
+            array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->second.last_uptime_proof));
+            array_entry.emplace("expiration_date",          expiration_time_str);
+            array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
+        }
+        array.push_back(array_entry);
+    }
+
+}
+
 std::string
 render_quorum_states_html(bool add_header_and_footer)
 {
@@ -770,111 +804,55 @@ render_quorum_states_html(bool add_header_and_footer)
         block_height = 0;
     }
 
-    for (size_t height = block_height; num_quorums_to_render > 0; --num_quorums_to_render, --height)
+    COMMAND_RPC_GET_QUORUM_STATE_BATCHED::response batched_response = {};
+    rpc.get_quorum_state_batched(batched_response, block_height - num_quorums_to_render, block_height)
+
+    COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
+    rpc.get_service_node(sn_response, {});
+
+    sn_entry_map pk2sninfo;
+
+    for (const auto& entry : sn_response.service_node_states)
     {
-      mstch::map quorum_part;
-      quorum_part["quorum_height"] = (uint64_t) height;
+        pk2sninfo.insert({entry.service_node_pubkey, entry});
+    }
 
-      // TODO(doyle): We should support querying batch quorums for perf
-      COMMAND_RPC_GET_QUORUM_STATE::response response = {};
-      rpc.get_quorum_state(response, height);
+    for (const auto& entry : batched_response.quorum_entries)
+    {
+        const uint64_t height = entry.height;
 
-      char const quorum_node_array_id[]       = "quorum_nodes_array";
-      char const nodes_to_test_array_id[]     = "nodes_to_test_array";
-      quorum_part[quorum_node_array_id]       = mstch::array();
-      quorum_part[nodes_to_test_array_id]     = mstch::array();
-      quorum_part["quorum_nodes_array_size"]  = (int) response.quorum_nodes.size();
-      quorum_part["nodes_to_test_array_size"] = (int) response.nodes_to_test.size();
+        mstch::map quorum_part;
+        quorum_part["quorum_height"] = height;
 
-      mstch::array& quorum_node_array   = boost::get<mstch::array>(quorum_part[quorum_node_array_id]);
-      mstch::array& nodes_to_test_array = boost::get<mstch::array>(quorum_part[nodes_to_test_array_id]);
-      quorum_node_array.reserve(response.quorum_nodes.size());
-      nodes_to_test_array.reserve(response.nodes_to_test.size());
+        char const quorum_node_array_id[]       = "quorum_nodes_array";
+        char const nodes_to_test_array_id[]     = "nodes_to_test_array";
+        quorum_part[quorum_node_array_id]       = mstch::array();
+        quorum_part[nodes_to_test_array_id]     = mstch::array();
 
-      static const std::string failed_entry = "--";
-      // TODO: refactor me pls
-      {
-        COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
-        rpc.get_service_node(sn_response, response.quorum_nodes);
+        quorum_part["quorum_nodes_array_size"]  = entry.quorum_nodes.size();
+        quorum_part["nodes_to_test_array_size"] = entry.nodes_to_test.size();
 
-        for (size_t i = 0; i < response.quorum_nodes.size(); ++i)
-        {
-          std::string const &pub_key = response.quorum_nodes[i];
-          mstch::map array_entry { {"public_key", pub_key}, };
+        mstch::array& quorum_node_array   = boost::get<mstch::array>(quorum_part[quorum_node_array_id]);
+        mstch::array& nodes_to_test_array = boost::get<mstch::array>(quorum_part[nodes_to_test_array_id]);
+        quorum_node_array.reserve(entry.quorum_nodes.size());
+        nodes_to_test_array.reserve(entry.nodes_to_test.size());
 
-          // TODO(doyle): Improve runtime complexity
-          auto it =  std::find_if(sn_response.service_node_states.begin(), sn_response.service_node_states.end(), [&pub_key](COMMAND_RPC_GET_SERVICE_NODES::response::entry const &a) -> bool {
-              return a.service_node_pubkey == pub_key;
-          });
+        gather_sn_data(entry.quorum_nodes, pk2sninfo, quorum_node_array);
+        gather_sn_data(entry.nodes_to_test, pk2sninfo, nodes_to_test_array);
 
-          if (it == sn_response.service_node_states.end())
-          {
-            array_entry.emplace("last_uptime_proof",        failed_entry);
-            array_entry.emplace("expiration_date",          failed_entry);
-            array_entry.emplace("expiration_time_relative", failed_entry);
-          }
-          else
-          {
-            static std::string expiration_time_str;
-            time_t expiry_time = calculate_service_node_expiry_timestamp(it->registration_height);
-            expiration_time_str.clear();
-            get_human_readable_timestamp(expiry_time, &expiration_time_str);
-
-            array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->last_uptime_proof));
-            array_entry.emplace("expiration_date",          expiration_time_str);
-            array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
-          }
-          quorum_node_array.push_back(array_entry);
-        }
-      }
-
-      {
-        COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
-        rpc.get_service_node(sn_response, response.nodes_to_test);
-
-        for (size_t i = 0; i < response.nodes_to_test.size(); ++i)
-        {
-          std::string const &pub_key = response.nodes_to_test[i];
-          mstch::map array_entry { {"public_key", pub_key}, };
-
-          auto it =  std::find_if(sn_response.service_node_states.begin(), sn_response.service_node_states.end(), [&pub_key](COMMAND_RPC_GET_SERVICE_NODES::response::entry const &a) -> bool {
-              return a.service_node_pubkey == pub_key;
-          });
-
-          if (it == sn_response.service_node_states.end())
-          {
-            array_entry.emplace("last_uptime_proof",        failed_entry);
-            array_entry.emplace("expiration_date",          failed_entry);
-            array_entry.emplace("expiration_time_relative", failed_entry);
-          }
-          else
-          {
-            static std::string expiration_time_str;
-            time_t expiry_time = calculate_service_node_expiry_timestamp(it->registration_height);
-            expiration_time_str.clear();
-            get_human_readable_timestamp(expiry_time, &expiration_time_str);
-
-            array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->last_uptime_proof));
-            array_entry.emplace("expiration_date",          expiration_time_str);
-            array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
-          }
-          nodes_to_test_array.push_back(array_entry);
-        }
-      }
-
-      quorum_array.push_back(quorum_part);
+        quorum_array.push_back(quorum_part);
     }
 
     if (on_homepage)
     {
-      quorum_state_context.html_context = mstch::render(template_file["quorum_states"], page_context);
-      return quorum_state_context.html_context;
+        quorum_state_context.html_context = mstch::render(template_file["quorum_states"], page_context);
+        return quorum_state_context.html_context;
     }
     else
     {
-      add_css_style(page_context);
-      quorum_state_context.html_full_context = mstch::render(template_file["quorum_states_full"], page_context);
-      return quorum_state_context.html_full_context;
+        add_css_style(page_context);
+        quorum_state_context.html_full_context = mstch::render(template_file["quorum_states_full"], page_context);
+        return quorum_state_context.html_full_context;
     }
 }
 
