@@ -710,6 +710,18 @@ curl  -w "\n" -X GET "http://127.0.0.1:8081/api/emission"
 
 Emission only works when the emission monitoring thread is enabled.
 
+#### api/circulating\_supply
+
+```bash
+curl  -w "\n" -X GET "http://127.0.0.1:8081/api/circulating_supply"
+```
+
+```
+15606500
+```
+
+Circulating supply only works when the emission monitoring thread is enabled.
+
 #### api/version
 
 ```bash

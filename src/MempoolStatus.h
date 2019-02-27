@@ -83,12 +83,15 @@ struct MempoolStatus
         uint64_t block_weight_limit {0};
         char block_size_limit_str[10];   // needs to be trivially copyable
         char block_size_median_str[10];  // std::string is not trivially copyable
+        char total_blockchain_size_str[10];
         uint64_t start_time  {0};
         uint64_t current_hf_version {0};
 
         uint64_t hash_rate  {0};
         uint64_t fee_per_kb  {0};
         uint64_t info_timestamp  {0};
+        uint64_t staking_requirement {0};
+        uint64_t total_blockchain_size {0};
 
         bool current {false};
 

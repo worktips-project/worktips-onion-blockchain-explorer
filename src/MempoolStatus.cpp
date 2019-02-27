@@ -267,6 +267,10 @@ MempoolStatus::read_network_info()
     if (!rpc.get_hardfork_info(rpc_hardfork_info))
         return false;
 
+    COMMAND_RPC_GET_STAKING_REQUIREMENT::response staking_requirement = {};
+    uint64_t query_height = (rpc_network_info.height < rpc_network_info.target_height) ? rpc_network_info.target_height : rpc_network_info.height;
+    if (!rpc.get_staking_requirement(query_height, staking_requirement))
+        return false;
 
     network_info local_copy;
 
@@ -289,7 +293,8 @@ MempoolStatus::read_network_info()
     local_copy.block_size_median          = rpc_network_info.block_size_median;
     local_copy.block_weight_limit         = rpc_network_info.block_weight_limit;
     local_copy.start_time                 = rpc_network_info.start_time;
-
+    local_copy.staking_requirement        = staking_requirement.staking_requirement;
+    local_copy.total_blockchain_size      = rpc_network_info.database_size;
 
     strncpy(local_copy.block_size_limit_str, fmt::format("{:0.2f}",
                                              static_cast<double>(
@@ -301,6 +306,11 @@ MempoolStatus::read_network_info()
                                               static_cast<double>(
                                               local_copy.block_size_median) / 1024.0).c_str(),
                                               sizeof(local_copy.block_size_median_str));
+                                              
+    strncpy(local_copy.total_blockchain_size_str, fmt::format("{:0.2f}",
+                                                  static_cast<double>(
+                                                  local_copy.total_blockchain_size) / 1024.0 / 1024.0 / 1024.0).c_str(),
+                                                  sizeof(local_copy.total_blockchain_size_str));                                                
 
     epee::string_tools::hex_to_pod(rpc_network_info.top_block_hash,
                                    local_copy.top_block_hash);
