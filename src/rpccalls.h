@@ -189,11 +189,15 @@ public:
     bool
     get_block(string const& blk_hash, block& blk, string& error_msg);
 
+    /// When `all` is set, ignore `pubkeys` and get info for all nodes
     bool
     get_service_node(COMMAND_RPC_GET_SERVICE_NODES::response &res, const std::vector<std::string> &pubkeys);
 
     bool
     get_quorum_state(COMMAND_RPC_GET_QUORUM_STATE::response &res, uint64_t height);
+
+    bool
+    get_quorum_state_batched(COMMAND_RPC_GET_QUORUM_STATE_BATCHED::response &res, uint64_t height_begin, uint64_t height_end);
 };
 
 

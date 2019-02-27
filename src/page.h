@@ -22,15 +22,20 @@
 
 #include "../ext/crow/crow.h"
 
+#include "../ext/json.hpp"
+
 #include "../ext/vpetrigocaches/cache.hpp"
 #include "../ext/vpetrigocaches/lru_cache_policy.hpp"
 #include "../ext/vpetrigocaches/fifo_cache_policy.hpp"
+#include "../ext/mstch/src/visitor/render_node.hpp"
+
+
 
 #include <algorithm>
 #include <limits>
 #include <ctime>
 #include <future>
-#include <visitor/render_node.hpp>
+
 
 #define TMPL_DIR                    "./templates"
 #define TMPL_PARIALS_DIR            TMPL_DIR "/partials"
@@ -191,8 +196,6 @@ using namespace std;
 
 using epee::string_tools::pod_to_hex;
 using epee::string_tools::hex_to_pod;
-
-
 
 /**
 * @brief The tx_details struct
@@ -583,7 +586,7 @@ time_t calculate_service_node_expiry_timestamp(uint64_t registration_height)
 {
     uint64_t curr_height   = core_storage->get_current_blockchain_height();
     uint64_t expiry_height = registration_height;
-    expiry_height += service_nodes::get_staking_requirement_lock_blocks(nettype);
+    expiry_height += service_nodes::staking_num_lock_blocks(nettype);
 
     int64_t delta_height = expiry_height - curr_height;
     time_t result = time(nullptr) + (delta_height * DIFFICULTY_TARGET_V2);
@@ -616,7 +619,19 @@ void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::v
         static std::string expiration_time_str;
         time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
         expiration_time_str.clear();
-        get_human_readable_timestamp(expiry_time, &expiration_time_str);
+        std::string expiration_time_relative;        
+        
+        if (expiry_time > 0) 
+        {
+          get_human_readable_timestamp(expiry_time, &expiration_time_str);
+          expiration_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
+        }
+        else 
+        {
+          expiration_time_str = "Infinitely Staking";
+        }
+        
+        if()
 
         mstch::map array_entry
         {
@@ -630,7 +645,7 @@ void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::v
           {"last_reward_at_block",          entry->last_reward_block_height},
           {"last_reward_at_block_tx_index", (entry->last_reward_transaction_index == UINT32_MAX) ? end_of_queue : std::to_string(entry->last_reward_transaction_index)},
           {"expiration_date",               expiration_time_str},
-          {"expiration_time_relative",      std::string(get_human_time_ago(expiry_time, time(nullptr)))},
+          {"expiration_time_relative",      expiration_time_relative},
           {"last_uptime_proof",             last_uptime_proof_to_string(entry->last_uptime_proof)},
         };
         array->push_back(array_entry);
@@ -698,8 +713,8 @@ render_service_nodes_html(bool add_header_and_footer)
     mstch::array& awaiting_array = boost::get<mstch::array>(page_context[awaiting_array_id]);
     generate_service_node_mapping(&awaiting_array, on_homepage, &unregistered);
     generate_service_node_mapping(&active_array, on_homepage, &registered);
-    page_context["service_node_active_size"]   = registered.size();
-    page_context["service_node_awaiting_size"] = unregistered.size();
+    page_context["service_node_active_size"]   = (int) registered.size();
+    page_context["service_node_awaiting_size"] = (int) unregistered.size();
 
     if (on_homepage)
     {
@@ -726,6 +741,40 @@ std::string last_uptime_proof_to_string(time_t uptime_proof)
   {
     return get_age(server_timestamp, uptime_proof).first;
   }
+}
+
+using sn_entry_map = std::unordered_map<std::string, COMMAND_RPC_GET_SERVICE_NODES::response::entry>;
+
+void gather_sn_data(const std::vector<std::string>& nodes, const sn_entry_map& sn_map, mstch::array& array)
+{
+    static const std::string failed_entry = "--";
+
+    for (const std::string& pub_key : nodes)
+    {
+        mstch::map array_entry { {"public_key", pub_key}, };
+
+        auto it = sn_map.find(pub_key);
+
+        if (it == sn_map.end())
+        {
+            array_entry.emplace("last_uptime_proof",        failed_entry);
+            array_entry.emplace("expiration_date",          failed_entry);
+            array_entry.emplace("expiration_time_relative", failed_entry);
+        }
+        else
+        {
+            static std::string expiration_time_str;
+            time_t expiry_time = calculate_service_node_expiry_timestamp(it->second.registration_height);
+            expiration_time_str.clear();
+            get_human_readable_timestamp(expiry_time, &expiration_time_str);
+
+            array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->second.last_uptime_proof));
+            array_entry.emplace("expiration_date",          expiration_time_str);
+            array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
+        }
+        array.push_back(array_entry);
+    }
+
 }
 
 std::string
@@ -755,111 +804,55 @@ render_quorum_states_html(bool add_header_and_footer)
         block_height = 0;
     }
 
-    for (size_t height = block_height; num_quorums_to_render > 0; --num_quorums_to_render, --height)
+    COMMAND_RPC_GET_QUORUM_STATE_BATCHED::response batched_response = {};
+    rpc.get_quorum_state_batched(batched_response, block_height - num_quorums_to_render, block_height)
+
+    COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
+    rpc.get_service_node(sn_response, {});
+
+    sn_entry_map pk2sninfo;
+
+    for (const auto& entry : sn_response.service_node_states)
     {
-      mstch::map quorum_part;
-      quorum_part["quorum_height"] = height;
+        pk2sninfo.insert({entry.service_node_pubkey, entry});
+    }
 
-      // TODO(doyle): We should support querying batch quorums for perf
-      COMMAND_RPC_GET_QUORUM_STATE::response response = {};
-      rpc.get_quorum_state(response, height);
+    for (const auto& entry : batched_response.quorum_entries)
+    {
+        const uint64_t height = entry.height;
 
-      char const quorum_node_array_id[]       = "quorum_nodes_array";
-      char const nodes_to_test_array_id[]     = "nodes_to_test_array";
-      quorum_part[quorum_node_array_id]       = mstch::array();
-      quorum_part[nodes_to_test_array_id]     = mstch::array();
-      quorum_part["quorum_nodes_array_size"]  = response.quorum_nodes.size();
-      quorum_part["nodes_to_test_array_size"] = response.nodes_to_test.size();
+        mstch::map quorum_part;
+        quorum_part["quorum_height"] = height;
 
-      mstch::array& quorum_node_array   = boost::get<mstch::array>(quorum_part[quorum_node_array_id]);
-      mstch::array& nodes_to_test_array = boost::get<mstch::array>(quorum_part[nodes_to_test_array_id]);
-      quorum_node_array.reserve(response.quorum_nodes.size());
-      nodes_to_test_array.reserve(response.nodes_to_test.size());
+        char const quorum_node_array_id[]       = "quorum_nodes_array";
+        char const nodes_to_test_array_id[]     = "nodes_to_test_array";
+        quorum_part[quorum_node_array_id]       = mstch::array();
+        quorum_part[nodes_to_test_array_id]     = mstch::array();
 
-      static const std::string failed_entry = "--";
-      // TODO: refactor me pls
-      {
-        COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
-        rpc.get_service_node(sn_response, response.quorum_nodes);
+        quorum_part["quorum_nodes_array_size"]  = entry.quorum_nodes.size();
+        quorum_part["nodes_to_test_array_size"] = entry.nodes_to_test.size();
 
-        for (size_t i = 0; i < response.quorum_nodes.size(); ++i)
-        {
-          std::string const &pub_key = response.quorum_nodes[i];
-          mstch::map array_entry { {"public_key", pub_key}, };
+        mstch::array& quorum_node_array   = boost::get<mstch::array>(quorum_part[quorum_node_array_id]);
+        mstch::array& nodes_to_test_array = boost::get<mstch::array>(quorum_part[nodes_to_test_array_id]);
+        quorum_node_array.reserve(entry.quorum_nodes.size());
+        nodes_to_test_array.reserve(entry.nodes_to_test.size());
 
-          // TODO(doyle): Improve runtime complexity
-          auto it =  std::find_if(sn_response.service_node_states.begin(), sn_response.service_node_states.end(), [&pub_key](COMMAND_RPC_GET_SERVICE_NODES::response::entry const &a) -> bool {
-              return a.service_node_pubkey == pub_key;
-          });
+        gather_sn_data(entry.quorum_nodes, pk2sninfo, quorum_node_array);
+        gather_sn_data(entry.nodes_to_test, pk2sninfo, nodes_to_test_array);
 
-          if (it == sn_response.service_node_states.end())
-          {
-            array_entry.emplace("last_uptime_proof",        failed_entry);
-            array_entry.emplace("expiration_date",          failed_entry);
-            array_entry.emplace("expiration_time_relative", failed_entry);
-          }
-          else
-          {
-            static std::string expiration_time_str;
-            time_t expiry_time = calculate_service_node_expiry_timestamp(it->registration_height);
-            expiration_time_str.clear();
-            get_human_readable_timestamp(expiry_time, &expiration_time_str);
-
-            array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->last_uptime_proof));
-            array_entry.emplace("expiration_date",          expiration_time_str);
-            array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
-          }
-          quorum_node_array.push_back(array_entry);
-        }
-      }
-
-      {
-        COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
-        rpc.get_service_node(sn_response, response.nodes_to_test);
-
-        for (size_t i = 0; i < response.nodes_to_test.size(); ++i)
-        {
-          std::string const &pub_key = response.nodes_to_test[i];
-          mstch::map array_entry { {"public_key", pub_key}, };
-
-          auto it =  std::find_if(sn_response.service_node_states.begin(), sn_response.service_node_states.end(), [&pub_key](COMMAND_RPC_GET_SERVICE_NODES::response::entry const &a) -> bool {
-              return a.service_node_pubkey == pub_key;
-          });
-
-          if (it == sn_response.service_node_states.end())
-          {
-            array_entry.emplace("last_uptime_proof",        failed_entry);
-            array_entry.emplace("expiration_date",          failed_entry);
-            array_entry.emplace("expiration_time_relative", failed_entry);
-          }
-          else
-          {
-            static std::string expiration_time_str;
-            time_t expiry_time = calculate_service_node_expiry_timestamp(it->registration_height);
-            expiration_time_str.clear();
-            get_human_readable_timestamp(expiry_time, &expiration_time_str);
-
-            array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->last_uptime_proof));
-            array_entry.emplace("expiration_date",          expiration_time_str);
-            array_entry.emplace("expiration_time_relative", std::string(get_human_time_ago(expiry_time, time(nullptr))));
-          }
-          nodes_to_test_array.push_back(array_entry);
-        }
-      }
-
-      quorum_array.push_back(quorum_part);
+        quorum_array.push_back(quorum_part);
     }
 
     if (on_homepage)
     {
-      quorum_state_context.html_context = mstch::render(template_file["quorum_states"], page_context);
-      return quorum_state_context.html_context;
+        quorum_state_context.html_context = mstch::render(template_file["quorum_states"], page_context);
+        return quorum_state_context.html_context;
     }
     else
     {
-      add_css_style(page_context);
-      quorum_state_context.html_full_context = mstch::render(template_file["quorum_states_full"], page_context);
-      return quorum_state_context.html_full_context;
+        add_css_style(page_context);
+        quorum_state_context.html_full_context = mstch::render(template_file["quorum_states_full"], page_context);
+        return quorum_state_context.html_full_context;
     }
 }
 
@@ -1232,6 +1225,7 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
             {"staking_requirement", print_money(current_network_info.staking_requirement)},
             {"age"                , network_info_age.first},
             {"age_format"         , network_info_age.second},
+            {"total_blockchain_size" , string {current_network_info.total_blockchain_size_str}},
     };
 
     // median size of 100 blocks
@@ -1716,14 +1710,14 @@ show_service_node(const std::string &service_node_pubkey)
     page_context["operator_address"]     = entry->operator_address;
     page_context["operator_address"]     = entry->operator_address;
     page_context["last_uptime_proof"]    = (entry->last_uptime_proof == 0) ? friendly_uptime_proof_not_received : get_age(server_timestamp, entry->last_uptime_proof).first;
-    page_context["num_contributors"]     = entry->contributors.size();
+    page_context["num_contributors"]     = (int) entry->contributors.size();
     page_context["register_height"]      = entry->registration_height;
 
     // Make contributor render data
     char const service_node_contributors_array_id[] = "service_node_contributors_array";
     page_context.emplace(service_node_contributors_array_id, mstch::array{});
     mstch::array& contributors = boost::get<mstch::array>(page_context[service_node_contributors_array_id]);
-    for (COMMAND_RPC_GET_SERVICE_NODES::response::contribution const &contributor : entry->contributors)
+    for (COMMAND_RPC_GET_SERVICE_NODES::response::contributor const &contributor : entry->contributors)
     {
       mstch::map array_entry
       {
@@ -2139,7 +2133,7 @@ show_ringmembers_hex(string const& tx_hash_str)
                     == false)
                 continue;
 
-            core_storage->get_db().get_output_key(in_key.amount,
+            core_storage->get_db().get_output_key(epee::span<const uint64_t>(&in_key.amount, 1),
                                                   absolute_offsets,
                                                   mixin_outputs);
         }
@@ -2167,11 +2161,345 @@ show_ringmembers_hex(string const& tx_hash_str)
     archive << all_mixin_outputs;
 
     // return as all_mixin_outputs vector hex
-    return epee::string_tools::buff_to_hex_nodelimer(oss.str());
-
+    return epee::string_tools
+            ::buff_to_hex_nodelimer(oss.str());
 }
 
+string
+show_ringmemberstx_hex(string const& tx_hash_str)
+{
+    transaction tx;
+    crypto::hash tx_hash;
 
+    if (!get_tx(tx_hash_str, tx, tx_hash))
+        return string {"Cant get tx: "} +  tx_hash_str;
+
+    vector<txin_to_key> input_key_imgs = lokeg::get_key_images(tx);
+
+    // key: constracted from concatenation of in_key.amount and absolute_offsets,
+    // value: vector of string where string is transaction hash + output index + tx_hex
+    // will have to cut this string when de-seraializing this data
+    // later in the unit tests
+    // transaction hash and output index represent tx_out_index
+    std::map<string, vector<string>> all_mixin_txs;
+
+    for (txin_to_key const& in_key: input_key_imgs)
+    {
+        // get absolute offsets of mixins
+        std::vector<uint64_t> absolute_offsets
+                = cryptonote::relative_output_offsets_to_absolute(
+                        in_key.key_offsets);
+
+        //tx_out_index is pair::<transaction hash, output index>
+        vector<tx_out_index> indices;
+
+        // get tx hashes and indices in the txs for the
+        // given outputs of mixins
+        //  this cant THROW DB_EXCEPTION
+        try
+        {
+            // get tx of the real output
+            core_storage->get_db().get_output_tx_and_index(
+                        in_key.amount, absolute_offsets, indices);
+        }
+        catch (exception const& e)
+        {
+
+            string out_msg = fmt::format(
+                    "Cant get ring member tx_out_index for tx {:s}", tx_hash_str
+            );
+
+            cerr << out_msg << endl;
+
+            return string(out_msg);
+        }
+
+        string map_key = std::to_string(in_key.amount);
+
+        for (auto const& ao: absolute_offsets)
+            map_key += std::to_string(ao);
+
+        // serialize each mixin tx
+        for (auto const& txi : indices)
+        {
+           auto const& mixin_tx_hash = txi.first;
+           auto const& output_index_in_tx = txi.second;
+
+           transaction mixin_tx;
+
+           if (!mcore->get_tx(mixin_tx_hash, mixin_tx))
+           {
+               throw std::runtime_error("Cant get tx: "
+                                        + pod_to_hex(mixin_tx_hash));
+           }
+
+           // serialize tx
+           string tx_hex = epee::string_tools::buff_to_hex_nodelimer(
+                                   t_serializable_object_to_blob(mixin_tx));
+
+           all_mixin_txs[map_key].push_back(
+                       pod_to_hex(mixin_tx_hash)
+                       + std::to_string(output_index_in_tx)
+                       + tx_hex);
+        }
+
+    } // for (txin_to_key const& in_key: input_key_imgs)
+
+    if (all_mixin_txs.empty())
+        return string {"No ring members to serialize"};
+
+    // archive all_mixin_outputs vector
+    std::ostringstream oss;
+    boost::archive::portable_binary_oarchive archive(oss);
+    archive << all_mixin_txs;
+
+    // return as all_mixin_outputs vector hex
+    return epee::string_tools
+            ::buff_to_hex_nodelimer(oss.str());
+}
+
+/**
+ * @brief Get ring member tx data
+ *
+ * Used for generating json file of txs used in unit testing.
+ * Thanks to json output from this function, we can mock
+ * a number of blockchain quries about key images
+ *
+ * @param tx_hash_str
+ * @return
+ */
+json
+show_ringmemberstx_jsonhex(string const& tx_hash_str)
+{
+    transaction tx;
+    crypto::hash tx_hash;
+
+    if (!get_tx(tx_hash_str, tx, tx_hash))
+        return string {"Cant get tx: "} +  tx_hash_str;
+
+    vector<txin_to_key> input_key_imgs = lokeg::get_key_images(tx);
+
+    json tx_json;
+
+    string tx_hex;
+
+    try
+    {
+        tx_hex = tx_to_hex(tx);
+    }
+    catch (std::exception const& e)
+    {
+        cerr << e.what() << endl;
+        return json {"error", "Failed to obtain hex of tx"};
+    }
+
+    tx_json["hash"] = tx_hash_str;
+    tx_json["hex"]  = tx_hex;
+    tx_json["nettype"] = static_cast<size_t>(nettype);
+    tx_json["is_ringct"] = (tx.version > 1);
+    tx_json["rct_type"] = tx.rct_signatures.type;
+
+    tx_json["_comment"] = "Just a placeholder for some comment if needed later";
+
+    // add placeholder for sender and recipient details
+    // this is most useful for unit testing on stagenet/testnet
+    // private monero networks, so we can easly put these
+    // networks accounts details here.
+    tx_json["sender"] = json {
+                            {"seed", ""},
+                            {"address", ""},
+                            {"viewkey", ""},
+                            {"spendkey", ""},
+                            {"amount", 0ull},
+                            {"change", 0ull},
+                            {"outputs", json::array({json::array(
+                                            {"index placeholder",
+                                             "public_key placeholder",
+                                             "amount placeholder"}
+                                        )})
+                            },
+                            {"_comment", ""}};
+
+    tx_json["recipient"] = json::array();
+
+
+    tx_json["recipient"].push_back(
+                            json { {"seed", ""},
+                                {"address", ""},
+                                {"is_subaddress", false},
+                                {"viewkey", ""},
+                                {"spendkey", ""},
+                                {"amount", 0ull},
+                                {"outputs", json::array({json::array(
+                                               {"index placeholder",
+                                                "public_key placeholder",
+                                                "amount placeholder"}
+                                           )})
+                                },
+                                {"_comment", ""}});
+
+
+    uint64_t tx_blk_height {0};
+
+    try
+    {
+        tx_blk_height = core_storage->get_db().get_tx_block_height(tx_hash);
+    }
+    catch (exception& e)
+    {
+        cerr << "Cant get block height: " << tx_hash
+             << e.what() << endl;
+
+        return json {"error", "Cant get block height"};
+    }
+
+    // get block cointaining this tx
+    block blk;
+
+    if ( !mcore->get_block_by_height(tx_blk_height, blk))
+    {
+        cerr << "Cant get block: " << tx_blk_height << endl;
+        return json {"error", "Cant get block"};
+    }
+
+    block_complete_entry complete_block_data;
+
+    if (!mcore->get_block_complete_entry(blk, complete_block_data))
+    {
+        cerr << "Failed to obtain complete block data " << endl;
+        return json {"error", "Failed to obtain complete block data "};
+    }
+
+    std::string complete_block_data_str;
+
+    if(!epee::serialization::store_t_to_binary(
+                complete_block_data, complete_block_data_str))
+    {
+        cerr << "Failed to serialize complete_block_data\n";
+        return json {"error", "Failed to obtain complete block data"};
+    }
+
+    tx_details txd = get_tx_details(tx);
+
+    tx_json["payment_id"] = pod_to_hex(txd.payment_id);
+    tx_json["payment_id8"] = pod_to_hex(txd.payment_id8);
+    tx_json["payment_id8e"] = pod_to_hex(txd.payment_id8);
+
+    tx_json["block"] = epee::string_tools
+             ::buff_to_hex_nodelimer(complete_block_data_str);
+
+    tx_json["block_version"] = json {blk.major_version, blk.minor_version};
+
+    tx_json["inputs"] = json::array();
+
+
+    // key: constracted from concatenation of in_key.amount and absolute_offsets,
+    // value: vector of string where string is transaction hash + output index + tx_hex
+    // will have to cut this string when de-seraializing this data
+    // later in the unit tests
+    // transaction hash and output index represent tx_out_index
+    std::map<string, vector<string>> all_mixin_txs;
+
+    for (txin_to_key const& in_key: input_key_imgs)
+    {
+        // get absolute offsets of mixins
+        std::vector<uint64_t> absolute_offsets
+                = cryptonote::relative_output_offsets_to_absolute(
+                        in_key.key_offsets);
+
+        //tx_out_index is pair::<transaction hash, output index>
+        vector<tx_out_index> indices;
+        std::vector<output_data_t> mixin_outputs;
+
+        // get tx hashes and indices in the txs for the
+        // given outputs of mixins
+        //  this cant THROW DB_EXCEPTION
+        try
+        {
+            // get tx of the real output
+            core_storage->get_db().get_output_tx_and_index(
+                        in_key.amount, absolute_offsets, indices);
+
+            // get mining ouput info
+            core_storage->get_db().get_output_key(
+                        epee::span<const uint64_t>(&in_key.amount, 1),
+                        absolute_offsets,
+                        mixin_outputs);
+        }
+        catch (exception const& e)
+        {
+
+            string out_msg = fmt::format(
+                    "Cant get ring member tx_out_index for tx {:s}", tx_hash_str
+            );
+
+            cerr << out_msg << endl;
+
+            return json {"error", out_msg};
+        }
+
+
+        tx_json["inputs"].push_back(json {{"key_image", pod_to_hex(in_key.k_image)},
+                                          {"amount", in_key.amount},
+                                          {"absolute_offsets", absolute_offsets},
+                                          {"ring_members", json::array()}});
+
+        json& ring_members = tx_json["inputs"].back()["ring_members"];
+
+
+        if (indices.size() != mixin_outputs.size())
+        {
+            cerr << "indices.size() != mixin_outputs.size()\n";
+            return json {"error", "indices.size() != mixin_outputs.size()"};
+        }
+
+        // serialize each mixin tx
+        //for (auto const& txi : indices)
+        for (size_t i = 0; i < indices.size(); ++i)
+        {
+
+           tx_out_index const& txi = indices[i];
+           output_data_t const& mo = mixin_outputs[i];
+
+           auto const& mixin_tx_hash = txi.first;
+           auto const& output_index_in_tx = txi.second;
+
+           transaction mixin_tx;
+
+           if (!mcore->get_tx(mixin_tx_hash, mixin_tx))
+           {
+               throw std::runtime_error("Cant get tx: "
+                                        + pod_to_hex(mixin_tx_hash));
+           }
+
+           // serialize tx
+           string tx_hex = epee::string_tools::buff_to_hex_nodelimer(
+                                   t_serializable_object_to_blob(mixin_tx));
+
+           ring_members.push_back(
+                   json {
+                          {"ouput_pk", pod_to_hex(mo.pubkey)},
+                          {"tx_hash", pod_to_hex(mixin_tx_hash)},
+                          {"output_index_in_tx", txi.second},
+                          {"tx_hex", tx_hex},
+                   });
+
+        }
+
+    } // for (txin_to_key const& in_key: input_key_imgs)
+
+
+    // archive all_mixin_outputs vector
+    std::ostringstream oss;
+    boost::archive::portable_binary_oarchive archive(oss);
+    archive << all_mixin_txs;
+
+    // return as all_mixin_outputs vector hex
+    //return epee::string_tools
+    //        ::buff_to_hex_nodelimer(oss.str());
+
+    return tx_json;
+}
 
 string
 show_my_outputs(string tx_hash_str,
@@ -2491,8 +2819,11 @@ show_my_outputs(string tx_hash_str,
                           address_info.address.m_spend_public_key,
                           tx_pubkey);
 
-        //cout << pod_to_hex(outp.first.key) << endl;
-        //cout << pod_to_hex(tx_pubkey) << endl;
+//        cout << pod_to_hex(derivation) << ", " << output_idx << ", "
+//             << pod_to_hex(address_info.address.m_spend_public_key) << ", "
+//             << pod_to_hex(outp.first.key) << " == "
+//             << pod_to_hex(tx_pubkey) << '\n'  << '\n';
+
 
         // check if generated public key matches the current output's key
         bool mine_output = (outp.first.key == tx_pubkey);
@@ -2506,6 +2837,7 @@ show_my_outputs(string tx_hash_str,
                               output_idx,
                               address_info.address.m_spend_public_key,
                               tx_pubkey);
+
 
             mine_output = (outp.first.key == tx_pubkey);
 
@@ -2605,7 +2937,7 @@ show_my_outputs(string tx_hash_str,
             if (are_absolute_offsets_good(absolute_offsets, in_key) == false)
                 continue;
 
-            core_storage->get_db().get_output_key(in_key.amount,
+            core_storage->get_db().get_output_key(epee::span<const uint64_t>(&in_key.amount, 1),
                                                   absolute_offsets,
                                                   mixin_outputs);
         }
@@ -3102,7 +3434,7 @@ show_checkrawtx(string raw_tx_data, string action)
 
                 mstch::map tx_cd_data {
                         {"no_of_sources"      , static_cast<uint64_t>(no_of_sources)},
-                        {"use_rct"            , tx_cd.use_rct},
+                        {"use_rct"            , tx_cd.v2_use_rct},
                         {"change_amount"      , lokeg::lok_amount_to_str(tx_change.amount)},
                         {"has_payment_id"     , (payment_id  != null_hash)},
                         {"has_payment_id8"    , (payment_id8 != null_hash8)},
@@ -4767,7 +5099,7 @@ json_transaction(string tx_hash_str)
             if (are_absolute_offsets_good(absolute_offsets, in_key) == false)
                 continue;
 
-            core_storage->get_db().get_output_key(in_key.amount,
+            core_storage->get_db().get_output_key(epee::span<const uint64_t>(&in_key.amount, 1),
                                                   absolute_offsets,
                                                   outputs);
         }
@@ -4970,7 +5302,7 @@ json_block(string block_no_or_hash)
             {"data"  , json {}}
     };
 
-    json& j_data = j_response["data"];
+    nlohmann::json& j_data = j_response["data"];
 
     uint64_t current_blockchain_height
             =  core_storage->get_current_blockchain_height();
@@ -6378,7 +6710,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
     {
         tx_extra_service_node_deregister deregister;
         tx_extra_service_node_register   register_;
-        if (tx.is_deregister_tx())
+        if (tx.get_type() == cryptonote::transaction::type_deregister)
         {
             context["have_deregister_info"] = true;
             if (get_service_node_deregister_from_tx_extra(tx.extra, deregister))
@@ -6531,7 +6863,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
 
             // offsets seems good, so try to get the outputs for the amount and
             // offsets given
-            core_storage->get_db().get_output_key(in_key.amount,
+            core_storage->get_db().get_output_key(epee::span<const uint64_t>(&in_key.amount, 1),
                                                   absolute_offsets,
                                                   outputs);
         }
@@ -6744,7 +7076,8 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
         if (core_storage->get_db().tx_exists(txd.hash, tx_index))
         {
             out_amount_indices = core_storage->get_db()
-                    .get_tx_amount_output_indices(tx_index);
+                    .get_tx_amount_output_indices(tx_index)
+                    .front();
         }
         else
         {
@@ -7114,7 +7447,8 @@ get_loki_network_info(json& j_info)
        {"block_size_median"         , local_copy_network_info.block_size_median},
        {"start_time"                , local_copy_network_info.start_time},
        {"fee_per_kb"                , local_copy_network_info.fee_per_kb},
-       {"current_hf_version"        , local_copy_network_info.current_hf_version}
+       {"current_hf_version"        , local_copy_network_info.current_hf_version},
+       {"total_blockchain_size"     , local_copy_network_info.total_blockchain_size}
     };
 
     return local_copy_network_info.current;
