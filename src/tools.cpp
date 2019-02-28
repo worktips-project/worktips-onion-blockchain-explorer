@@ -1243,7 +1243,7 @@ get_human_readable_timestamp(uint64_t ts)
 
     gmtime_r(&tt, &tm);
 
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d %I:%M:%S", &tm);
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm);
 
     return std::string(buffer);
 }
@@ -1336,7 +1336,7 @@ get_human_readable_timestamp(uint64_t ts, std::string *result)
     time_t tt = ts;
     struct tm tm;
     gmtime_r(&tt, &tm);
-    strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &tm);
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
     *result = buf;
 }
 
