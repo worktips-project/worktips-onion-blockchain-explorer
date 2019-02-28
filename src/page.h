@@ -614,25 +614,7 @@ void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::v
         int operator_cut_in_percent = portions_to_percent(entry->portions_for_operator);
 
         std::string expiration_time_relative;
-        std::string expiration_time_str;
-        uint64_t expiry_height = 0;
-
-        if (entry->contributors[0].locked_contributions.size() > 0)
-          expiry_height = entry->requested_unlock_height;
-        else
-          expiry_height = entry->registration_height + service_nodes::staking_num_lock_blocks(nettype);
-
-        if (expiry_height > 0)
-        {
-          time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
-          get_human_readable_timestamp(expiry_time, &expiration_time_str);
-          expiration_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
-        }
-        else
-        {
-          expiration_time_relative = "N/A";
-          expiration_time_str = "Staking Infinitely";
-        }
+        std::string expiration_time_str = make_service_node_expiry_time_str(entry, &expiration_time_relative);
 
         mstch::map array_entry
         {
@@ -746,6 +728,40 @@ std::string last_uptime_proof_to_string(time_t uptime_proof)
 
 using sn_entry_map = std::unordered_map<std::string, COMMAND_RPC_GET_SERVICE_NODES::response::entry>;
 
+static bool service_node_entry_is_infinite_staking(COMMAND_RPC_GET_SERVICE_NODES::response::entry const *entry)
+{
+  bool result = entry->contributors[0].locked_contributions.size() > 0;
+  return result;
+}
+
+std::string make_service_node_expiry_time_str(COMMAND_RPC_GET_SERVICE_NODES::response::entry const *entry, std::string *expiry_time_relative)
+{
+  std::string result;
+  uint64_t expiry_height = 0;
+
+  if (entry->contributors[0].locked_contributions.size() > 0)
+    expiry_height = entry->requested_unlock_height;
+  else
+    expiry_height = entry->registration_height + service_nodes::staking_num_lock_blocks(nettype);
+
+  if (expiry_height > 0)
+  {
+    time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
+    get_human_readable_timestamp(expiry_time, &result);
+    if (expiry_time_relative)
+      *expiry_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
+  }
+  else
+  {
+    if (expiry_time_relative)
+      *expiry_time_relative = "N/A";
+
+    result = "Staking Infinitely";
+  }
+
+  return result;
+}
+
 void gather_sn_data(const std::vector<std::string>& nodes, const sn_entry_map& sn_map, mstch::array& array)
 {
     static const std::string failed_entry = "--";
@@ -765,25 +781,7 @@ void gather_sn_data(const std::vector<std::string>& nodes, const sn_entry_map& s
         else
         {
             std::string expiration_time_relative;
-            std::string expiration_time_str;
-
-            uint64_t expiry_height = 0;
-            if (it->second.contributors[0].locked_contributions.size() > 0)
-              expiry_height = it->second.requested_unlock_height;
-            else
-              expiry_height = it->second.registration_height + service_nodes::staking_num_lock_blocks(nettype);
-
-            if (expiry_height > 0)
-            {
-              time_t expiry_time = calculate_service_node_expiry_timestamp(it->second.registration_height);
-              get_human_readable_timestamp(expiry_time, &expiration_time_str);
-              expiration_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
-            }
-            else
-            {
-              expiration_time_relative = "N/A";
-              expiration_time_str = "Staking Infinitely";
-            }
+            std::string expiration_time_str = make_service_node_expiry_time_str(&it->second, &expiration_time_relative);
 
             array_entry.emplace("last_uptime_proof",        last_uptime_proof_to_string(it->second.last_uptime_proof));
             array_entry.emplace("expiration_date",          expiration_time_str);
@@ -834,7 +832,7 @@ render_quorum_states_html(bool add_header_and_footer)
         pk2sninfo.insert({entry.service_node_pubkey, entry});
     }
 
-    // TODO(doyle): Use std::min as workaround, sigh ... the person who wrote this bit did not test the code ..
+    // TODO(doyle): Use std::min as workaround, sigh ... fix off by one pls or something pls.
     for (int i = 0; i < std::min(num_quorums_to_render, batched_response.quorum_entries.size()); ++i)
     {
         const auto& entry = batched_response.quorum_entries[i];
@@ -1751,16 +1749,24 @@ show_service_node(const std::string &service_node_pubkey)
     char const service_node_registered_text_id[] = "service_node_registered_text";
     if (entry->total_contributed == entry->staking_requirement)
     {
+      bool node_scheduled_for_expiry = true;
+      if (service_node_entry_is_infinite_staking(entry))
+        node_scheduled_for_expiry = (entry->requested_unlock_height > 0);
 
-      time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
-      std::string str = "This service node is registered and active on the network and expires on the ";
-
-      std::string expiry_friendly_timestamp;
-      get_human_readable_timestamp(expiry_time, &expiry_friendly_timestamp);
-      str += expiry_friendly_timestamp;
-
-      str += " or ";
-      str += get_human_time_ago(expiry_time, time(nullptr));
+      std::string str = "This service node is registered and active on the network. ";
+      if (node_scheduled_for_expiry)
+      {
+        std::string expiry_time_relative;
+        std::string expiry_time_str = make_service_node_expiry_time_str(entry, &expiry_time_relative);
+        str += "It is scheduled to expire on the ";
+        str += expiry_time_str;
+        str += " or ";
+        str += expiry_time_relative;
+      }
+      else
+      {
+        str += "The service node is staking infinitely, no unlock has been requested yet.";
+      }
 
       page_context[service_node_registered_text_id] = str;
     }
