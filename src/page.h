@@ -582,11 +582,9 @@ int portions_to_percent(uint64_t portions)
     return result;
 }
 
-time_t calculate_service_node_expiry_timestamp(uint64_t registration_height)
+time_t calculate_service_node_expiry_timestamp(uint64_t expiry_height)
 {
     uint64_t curr_height   = core_storage->get_current_blockchain_height();
-    uint64_t expiry_height = registration_height;
-    expiry_height += service_nodes::staking_num_lock_blocks(nettype);
 
     int64_t delta_height = expiry_height - curr_height;
     time_t result = time(nullptr) + (delta_height * DIFFICULTY_TARGET_V2);
@@ -746,7 +744,7 @@ std::string make_service_node_expiry_time_str(COMMAND_RPC_GET_SERVICE_NODES::res
 
   if (expiry_height > 0)
   {
-    time_t expiry_time = calculate_service_node_expiry_timestamp(entry->registration_height);
+    time_t expiry_time = calculate_service_node_expiry_timestamp(expiry_height);
     get_human_readable_timestamp(expiry_time, &result);
     if (expiry_time_relative)
       *expiry_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
@@ -6731,7 +6729,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             {"construction_time"     , string {}},
     };
 
-    if (tx.version == transaction::version_3_per_output_unlock_times)
+    if (tx.version >= transaction::version_3_per_output_unlock_times)
     {
         tx_extra_service_node_deregister deregister;
         tx_extra_service_node_register   register_;
