@@ -6799,7 +6799,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             {
               crypto::public_key const &spend_key = register_.m_public_spend_keys[i];
               crypto::public_key const &view_key =  register_.m_public_view_keys[i];
-              uint32_t portion = register_.m_portions[i];
+              auto portion = register_.m_portions[i];
 
               account_public_address address = {};
               address.m_spend_public_key     = spend_key;
