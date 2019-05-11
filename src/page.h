@@ -6627,6 +6627,19 @@ mark_real_mixins_on_timescales(
     }
 }
 
+std::string extract_sn_pubkey(const std::vector<uint8_t> &tx_extra)
+{
+    crypto::public_key snode_key;
+    if (get_service_node_pubkey_from_tx_extra(tx_extra, snode_key))
+    {
+        return pod_to_hex(snode_key);
+    }
+    else
+    {
+        return "<pubkey parsing error>";
+    }
+}
+
 mstch::map
 construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
 {
@@ -6731,8 +6744,9 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
 
     if (tx.version >= transaction::version_3_per_output_unlock_times)
     {
-        tx_extra_service_node_deregister deregister;
-        tx_extra_service_node_register   register_;
+        tx_extra_service_node_deregister   deregister;
+        tx_extra_service_node_register     register_;
+        cryptonote::account_public_address contributor;
         if (tx.get_type() == cryptonote::transaction::type_deregister)
         {
             context["have_deregister_info"] = true;
@@ -6771,18 +6785,10 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             // maybe. We only have information about the current state of
             // the network, so previous expired nodes no longer can be
             // accessed. This needs the store to db functionality.
-            crypto::public_key snode_key;
-            if (get_service_node_pubkey_from_tx_extra(tx.extra, snode_key))
-            {
-              context["register_service_node_pubkey"] = pod_to_hex(snode_key);
-            }
-            else
-            {
-              static std::string parsing_error = "<pubkey parsing error>";
-              context["register_service_node_pubkey"] = parsing_error;
-            }
+            // likewise for contributions, below.
 
             context["have_register_info"]             = true;
+            context["register_service_node_pubkey"]   = extract_sn_pubkey(tx.extra);
             context["register_portions_for_operator"] = portions_to_percent(register_.m_portions_for_operator);
             context["register_expiration_timestamp_friendly"]  = timestamp_to_str_gm(register_.m_expiration_timestamp);
             context["register_expiration_timestamp_relative"]  = std::string(get_human_time_ago(register_.m_expiration_timestamp, time(nullptr)));
@@ -6813,6 +6819,44 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
 
               array.push_back(entry);
             }
+        }
+        else if (get_service_node_contributor_from_tx_extra(tx.extra, contributor))
+        {
+			context["have_contribution_info"]           = true;
+			context["contribution_service_node_pubkey"] = extract_sn_pubkey(tx.extra);
+			context["contribution_address"]             = get_account_address_as_str(nettype, false /*is_subaddress*/, contributor);
+
+            crypto::secret_key tx_key;
+            crypto::key_derivation derivation;
+            uint64_t amount = 0;
+            if (cryptonote::get_tx_secret_key_from_tx_extra(tx.extra, tx_key) &&
+                    generate_key_derivation(contributor.m_view_public_key, tx_key, derivation) &&
+                    !tx.vout.empty() && tx.vout.back().target.type() == typeid(cryptonote::txout_to_key)) {
+                hw::device &hwdev = hw::get_device("default");
+                // The rules are a bit more complex to do this perfectly, and change depending on
+                // the fork version, but just assuming the stake is in the last tx will work (unless
+                // someone is building non-standard stake transactions manually).
+                size_t tx_offset = tx.vout.size() - 1;
+                rct::key mask;
+                crypto::secret_key scalar1;
+                hwdev.derivation_to_scalar(derivation, tx_offset, scalar1);
+                try {
+                    switch (tx.rct_signatures.type) {
+                        case rct::RCTTypeSimple:
+                        case rct::RCTTypeBulletproof:
+                        case rct::RCTTypeBulletproof2:
+                            amount = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), tx_offset, mask, hwdev);
+                            break;
+                        case rct::RCTTypeFull:
+                            amount = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), tx_offset, mask, hwdev);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                catch (const std::exception &e) { /* ignore */ }
+            }
+            context["contribution_amount"] = amount > 0 ? lokeg::lok_amount_to_str(amount, "{:0.9f}", true) : "<decode error>";
         }
     }
 

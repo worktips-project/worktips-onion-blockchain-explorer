@@ -99,6 +99,15 @@
         </table>
     {{/have_register_info}}
 
+    {{#have_contribution_info}}
+        <h2>Service Node Contribution</h2>
+        <div class="TitleDivider"></div>
+        <p>Service Node Public Key: {{contribution_service_node_pubkey}}</p>
+        <p>Contributor Address: {{contribution_address}}</p>
+        <p>Contribution Amount: {{contribution_amount}} LOKI</p>
+    {{/have_contribution_info}}
+
+
   <h2>Outputs</h2>
   <h4 class="Subtitle">{{outputs_no}} output(s) for total of {{outputs_lok_sum}} lok</h4>
   <div class="TitleDivider"></div>
