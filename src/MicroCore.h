@@ -30,7 +30,6 @@ namespace lokeg
 
         Blockchain m_blockchain_storage;
         tx_memory_pool m_mempool;
-        service_nodes::deregister_vote_pool m_deregister_vote_pool;
 
         hw::device* m_device;
 

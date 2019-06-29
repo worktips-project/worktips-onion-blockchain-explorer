@@ -53,11 +53,22 @@
         </tr>
     </table>
 
-    {{#have_deregister_info}}
+    {{#is_state_change}}
+        {{#state_change_deregister}}
         <h2>Service Node Deregister Metadata</h2>
+        {{/state_change_deregister}}
+        {{#state_change_decommission}}
+        <h2>Service Node Decommission Metadata</h2>
+        {{/state_change_decommission}}
+        {{#state_change_recommission}}
+        <h2>Service Node Recommission Metadata</h2>
+        {{/state_change_recommission}}
+        {{#state_change_ip_change_penalty}}
+        <h2>Service Node IP Change Metadata</h2>
+        {{/state_change_ip_change_penalty}}
         <div class="TitleDivider"></div>
-        <p>Service Node Index: {{deregister_service_node_index}}</p>
-        <p>Block Height: {{deregister_block_height}}</p>
+        <p>Service Node Index: {{state_change_service_node_index}}</p>
+        <p>Block Height: <a href="/block/{{state_change_block_height}}">{{state_change_block_height}}</a></p>
 
         <table class="Table">
             <tr class="TableHeader">
@@ -65,14 +76,14 @@
                 <td>Signature</td>
             </tr>
 
-            {{#deregister_vote_array}}
+            {{#state_change_vote_array}}
             <tr>
-                <td>{{deregister_voters_quorum_index}}</td>
-                <td>{{deregister_signature}}</td>
+                <td>{{state_change_voters_quorum_index}}</td>
+                <td>{{state_change_signature}}</td>
             </tr>
-            {{/deregister_vote_array}}
+            {{/state_change_vote_array}}
         </table>
-    {{/have_deregister_info}}
+    {{/is_state_change}}
 
     {{#have_register_info}}
         <h2>Service Node Register Metadata</h2>

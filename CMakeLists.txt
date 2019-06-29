@@ -118,6 +118,7 @@ set(LIBRARIES
         ringct
         ringct_basic
         device
+        randomx
         common
         mnemonics
         easylogging
