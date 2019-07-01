@@ -597,7 +597,6 @@ void set_service_node_fields(mstch::map &context, const cryptonote::COMMAND_RPC_
     num_contributors << entry.contributors.size() << "/" << MAX_NUMBER_OF_CONTRIBUTORS;
 
     uint64_t open_contribution_remaining = entry.staking_requirement > entry.total_reserved ? entry.staking_requirement - entry.total_reserved : 0;
-    uint64_t stake_remaining = entry.staking_requirement > entry.total_contributed ? entry.staking_requirement - entry.total_contributed : 0;
 
     std::string expiration_time_relative;
     std::string expiration_time_str = make_service_node_expiry_time_str(&entry, &expiration_time_relative);
@@ -609,13 +608,13 @@ void set_service_node_fields(mstch::map &context, const cryptonote::COMMAND_RPC_
         context["solo_node"] = true;
     context["operator_address"] = entry.operator_address;
     context["open_for_contribution"] = print_money(open_contribution_remaining);
-    if (!open_contribution_remaining && stake_remaining)
+    if (!open_contribution_remaining && !entry.funded)
         context["only_reserved_spots"] = true;
     context["total_contributed"] = print_money(entry.total_contributed);
     context["total_reserved"] = print_money(entry.total_reserved);
     context["staking_requirement"] = print_money(entry.staking_requirement);
-    context["stake_remaining"] = print_money(stake_remaining);
-    if (!stake_remaining)
+    context["stake_remaining"] = print_money(entry.funded ? 0 : entry.staking_requirement - entry.total_contributed);
+    if (entry.funded)
         context["is_fully_funded"] = true;
 
     context["register_height"] = entry.registration_height;
@@ -626,7 +625,7 @@ void set_service_node_fields(mstch::map &context, const cryptonote::COMMAND_RPC_
 
     if (entry.active)
         context["activation_height"] = entry.state_height;
-    else if (stake_remaining)
+    else if (!entry.funded)
         context["awaiting"] = true;
     else
         context["decommission_height"] = entry.state_height;
@@ -696,7 +695,7 @@ render_service_nodes_html(bool add_header_and_footer)
     {
         if (entry.active)
             active.push_back(&entry);
-        else if (entry.total_contributed >= entry.staking_requirement)
+        else if (entry.funded)
             inactive.push_back(&entry);
         else
             awaiting.push_back(&entry);
