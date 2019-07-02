@@ -1341,35 +1341,21 @@ get_human_readable_timestamp(uint64_t ts, std::string *result)
     *result = buf;
 }
 
-
-char const *get_human_time_ago(time_t t, time_t now)
+std::string get_human_timespan(time_t dt)
 {
-    if (t == now)
-      return "now";
+    std::ostringstream ss;
+    if (dt < 90)             ss << dt << " seconds";
+    else if (dt < 90 * 60)   ss << std::setprecision(1) << std::fixed << dt/60. << " minutes";
+    else if (dt < 36 * 3600) ss << std::setprecision(1) << std::fixed << dt/3600. << " hours";
+    else                     ss << std::setprecision(dt < 99.5 * 3600 ? 1 : 0) << std::fixed << dt/86400. << " days";
+    return ss.str();
+}
 
-    static char buf[128];
-    buf[0] = 0;
-
-    char *buf_ptr       = buf;
-    char const *buf_end = buf + sizeof(buf);
-    time_t dt           = t > now ? t - now : now - t;
-
-    if (t > now)
-    {
-      buf_ptr += snprintf(buf_ptr, buf_ptr - buf_end, "in ");
-    }
-
-    if (dt < 90)             buf_ptr += snprintf(buf_ptr, buf_ptr - buf_end, "%zu seconds", dt);
-    else if (dt < 90 * 60)   buf_ptr += snprintf(buf_ptr, buf_ptr - buf_end, "%zu minutes", dt/60);
-    else if (dt < 36 * 3600) buf_ptr += snprintf(buf_ptr, buf_ptr - buf_end, "%zu hours", dt/3600);
-    else                     buf_ptr += snprintf(buf_ptr, buf_ptr - buf_end, "%zu days", dt/(3600*24));
-
-    if (t < now)
-    {
-      buf_ptr += snprintf(buf_ptr, buf_ptr - buf_end, " ago");
-    }
-
-    return buf;
+std::string get_human_time_ago(time_t t, time_t now)
+{
+    if (t == now) return "now";
+    std::string span = get_human_timespan(t > now ? t - now : now - t);
+    return t > now ? "in " + span : span + " ago";
 }
 
 string

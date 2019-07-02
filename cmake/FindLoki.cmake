@@ -28,7 +28,7 @@
 # (c) 2014-2016 cpp-ethereum contributors.
 #------------------------------------------------------------------------------
 
-set(LIBS common;blocks;cryptonote_basic;cryptonote_core;multisig;
+set(LIBS common;blocks;cryptonote_basic;cryptonote_core;multisig;randomx;
 		cryptonote_protocol;daemonizer;mnemonics;epee;lmdb;device;
 		blockchain_db;ringct;wallet;cncrypto;easylogging;version;checkpoints)
 
@@ -44,7 +44,7 @@ foreach (l ${LIBS})
 	find_library(LOK_${L}_LIBRARY
 		NAMES ${l}
 		PATHS ${CMAKE_LIBRARY_PATH}
-		PATH_SUFFIXES "/src/${l}" "/src/" "/external/db_drivers/lib${l}" "/lib" "/src/crypto" "/contrib/epee/src" "/external/easylogging++/"
+		PATH_SUFFIXES "/src/${l}" "/src/" "/external/db_drivers/lib${l}" "/lib" "/src/crypto" "/contrib/epee/src" "/external/easylogging++/" "/external/randomx/"
 		NO_DEFAULT_PATH
 	)
 

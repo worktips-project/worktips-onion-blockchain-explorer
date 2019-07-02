@@ -591,46 +591,87 @@ time_t calculate_service_node_expiry_timestamp(uint64_t expiry_height)
     return result;
 }
 
-void generate_service_node_mapping(mstch::array *array, bool on_homepage, std::vector<COMMAND_RPC_GET_SERVICE_NODES::response::entry *> const *entries)
-{
-    static std::string end_of_queue = "End Of Queue";
-    size_t iterate_count = on_homepage ? snode_context.num_entries_on_front_page : entries->size();
-    iterate_count        = std::min(entries->size(), iterate_count);
+void set_service_node_fields(mstch::map &context, const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry &entry) {
 
-    array->reserve(iterate_count);
+    std::ostringstream num_contributors;
+    num_contributors << entry.contributors.size() << "/" << MAX_NUMBER_OF_CONTRIBUTORS;
 
-    static std::string num_contributors_str;
-    num_contributors_str.reserve(8);
-    for (size_t i = 0; i < iterate_count; ++i, num_contributors_str.clear())
-    {
-        COMMAND_RPC_GET_SERVICE_NODES::response::entry const *entry = (*entries)[i];
-        num_contributors_str += std::to_string(entry->contributors.size());
-        num_contributors_str += "/";
-        num_contributors_str += std::to_string(MAX_NUMBER_OF_CONTRIBUTORS);
+    uint64_t open_contribution_remaining = entry.staking_requirement > entry.total_reserved ? entry.staking_requirement - entry.total_reserved : 0;
 
-        uint64_t contribution_remaining = entry->staking_requirement - entry->total_reserved;
-        int operator_cut_in_percent = portions_to_percent(entry->portions_for_operator);
+    std::string expiration_time_relative;
+    std::string expiration_time_str = make_service_node_expiry_time_str(&entry, &expiration_time_relative);
 
-        std::string expiration_time_relative;
-        std::string expiration_time_str = make_service_node_expiry_time_str(entry, &expiration_time_relative);
+    context["public_key"] = entry.service_node_pubkey;
+    context["num_contributors"] = num_contributors.str();
+    context["operator_cut"] = portions_to_percent(entry.portions_for_operator);
+    if (entry.portions_for_operator == STAKING_PORTIONS)
+        context["solo_node"] = true;
+    context["operator_address"] = entry.operator_address;
+    context["open_for_contribution"] = print_money(open_contribution_remaining);
+    if (!open_contribution_remaining && !entry.funded)
+        context["only_reserved_spots"] = true;
+    context["total_contributed"] = print_money(entry.total_contributed);
+    context["total_reserved"] = print_money(entry.total_reserved);
+    context["staking_requirement"] = print_money(entry.staking_requirement);
+    context["stake_remaining"] = print_money(entry.funded ? 0 : entry.staking_requirement - entry.total_contributed);
+    if (entry.funded)
+        context["is_fully_funded"] = true;
 
-        mstch::map array_entry
-        {
-          {"public_key",                    entry->service_node_pubkey},
-          {"num_contributors",              num_contributors_str},
-          {"operator_cut",                  operator_cut_in_percent},
-          {"open_for_contribution",         print_money(contribution_remaining)},
-          {"contributed",                   print_money(entry->total_contributed)},
-          {"reserved",                      print_money(entry->total_reserved)},
-          {"staking_requirement",           print_money(entry->staking_requirement)},
-          {"last_reward_at_block",          entry->last_reward_block_height},
-          {"last_reward_at_block_tx_index", (entry->last_reward_transaction_index == UINT32_MAX) ? end_of_queue : std::to_string(entry->last_reward_transaction_index)},
-          {"expiration_date",               expiration_time_str},
-          {"expiration_time_relative",      expiration_time_relative},
-          {"last_uptime_proof",             last_uptime_proof_to_string(entry->last_uptime_proof)},
-        };
-        array->push_back(array_entry);
+    context["register_height"] = entry.registration_height;
+    context["last_reward_at_block"] = entry.last_reward_block_height;
+
+    if (entry.last_reward_transaction_index < std::numeric_limits<uint32_t>::max())
+        context["last_contribution_tx_index"] = entry.last_reward_transaction_index;
+
+    if (entry.active)
+        context["activation_height"] = entry.state_height;
+    else if (!entry.funded)
+        context["awaiting"] = true;
+    else
+        context["decommission_height"] = entry.state_height;
+
+    if (entry.requested_unlock_height > 0) {
+        context["expiration_block"] = entry.requested_unlock_height;
+        context["expiration_date"] = expiration_time_str;
+        context["expiration_time_relative"] = expiration_time_relative;
     }
+    context["last_uptime_proof"] = last_uptime_proof_to_string(entry.last_uptime_proof);
+    context["earned_downtime_blocks"] = entry.earned_downtime_blocks;
+    if (entry.earned_downtime_blocks > 0) {
+        context["credit_remaining"] = entry.earned_downtime_blocks;
+        context["earned_downtime"] = get_human_timespan(DIFFICULTY_TARGET_V2 * entry.earned_downtime_blocks);
+        if (entry.active && entry.earned_downtime_blocks < service_nodes::DECOMMISSION_MINIMUM)
+            context["earned_downtime_below_min"] = true;
+    }
+
+    auto &contributors = boost::get<mstch::array>(context.emplace("service_node_contributors", mstch::array{}).first->second);
+    for (const auto &contributor : entry.contributors)
+        contributors.push_back(mstch::map{
+                {"address",  contributor.address},
+                {"amount",   print_money(contributor.amount)},
+                {"reserved", print_money(contributor.reserved)},
+                });
+}
+
+void generate_service_node_mapping(mstch::map &context, std::string name, bool on_homepage, std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *> const &entries)
+{
+    size_t iterate_count = on_homepage ? snode_context.num_entries_on_front_page : entries.size();
+    iterate_count        = std::min(entries.size(), iterate_count);
+
+    auto &array = boost::get<mstch::array>(context.emplace(name, mstch::array()).first->second);
+    array.reserve(iterate_count);
+
+    for (size_t i = 0; i < iterate_count; ++i)
+    {
+        mstch::map array_entry;
+        set_service_node_fields(array_entry, *entries[i]);
+        array.push_back(std::move(array_entry));
+    }
+
+    context[name + "_size"] = entries.size();
+    size_t more = entries.size() - array.size();
+    if (more)
+        context[name + "_more"] = more;
 }
 
 std::string
@@ -644,58 +685,38 @@ render_service_nodes_html(bool add_header_and_footer)
       return (on_homepage) ? snode_context.html_context : snode_context.html_full_context;
     }
 
-    char const active_array_id[]   = "service_node_active_array";
-    char const awaiting_array_id[] = "service_node_awaiting_array";
-
-    mstch::map page_context;
-    page_context.emplace(active_array_id, mstch::array());
-    page_context.emplace(awaiting_array_id, mstch::array());
+    using sn_entry = cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry;
 
     // Split and sort the entries
-    std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *> unregistered;
-    std::vector<cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *> registered;
+    std::vector<sn_entry *> active, inactive, awaiting, reserved;
+    active.reserve(response.service_node_states.size());
+
+    for (auto &entry : response.service_node_states)
     {
-        registered.reserve  (response.service_node_states.size());
-        unregistered.reserve(response.service_node_states.size() * 0.5f);
-
-        for (auto &entry : response.service_node_states)
-        {
-          if (entry.total_contributed == entry.staking_requirement)
-          {
-            registered.push_back(&entry);
-          }
-          else
-          {
-            unregistered.push_back(&entry);
-          }
-        }
-
-        std::sort(unregistered.begin(), unregistered.end(),
-            [](const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *a, const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *b) {
-            uint64_t a_remaining = a->staking_requirement - a->total_reserved;
-            uint64_t b_remaining = b->staking_requirement - b->total_reserved;
-
-            if (b_remaining == a_remaining)
-              return b->portions_for_operator < a->portions_for_operator;
-
-            return b_remaining < a_remaining;
-        });
-
-        std::stable_sort(registered.begin(), registered.end(),
-            [](const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *a, const cryptonote::COMMAND_RPC_GET_SERVICE_NODES::response::entry *b) {
-            if (a->last_reward_block_height == b->last_reward_block_height)
-              return a->last_reward_transaction_index < b->last_reward_transaction_index;
-
-            return a->last_reward_block_height < b->last_reward_block_height;
-        });
+        if (entry.active)
+            active.push_back(&entry);
+        else if (entry.funded)
+            inactive.push_back(&entry);
+        else
+            awaiting.push_back(&entry);
     }
 
-    mstch::array& active_array   = boost::get<mstch::array>(page_context[active_array_id]);
-    mstch::array& awaiting_array = boost::get<mstch::array>(page_context[awaiting_array_id]);
-    generate_service_node_mapping(&awaiting_array, on_homepage, &unregistered);
-    generate_service_node_mapping(&active_array, on_homepage, &registered);
-    page_context["service_node_active_size"]   = (int) registered.size();
-    page_context["service_node_awaiting_size"] = (int) unregistered.size();
+    std::sort(active.begin(), active.end(), [](const sn_entry *a, const sn_entry *b) {
+        return std::make_tuple(a->last_reward_block_height, a->last_reward_transaction_index, a->service_node_pubkey)
+             < std::make_tuple(b->last_reward_block_height, b->last_reward_transaction_index, b->service_node_pubkey); });
+
+    std::sort(inactive.begin(), inactive.end(), [](const sn_entry *a, const sn_entry *b) {
+        return std::make_tuple(std::max(a->earned_downtime_blocks, int64_t{0}), a->state_height, a->last_uptime_proof, a->service_node_pubkey)
+             < std::make_tuple(std::max(b->earned_downtime_blocks, int64_t{0}), b->state_height, b->last_uptime_proof, b->service_node_pubkey); });
+
+    std::sort(awaiting.begin(), awaiting.end(), [](const sn_entry *a, const sn_entry *b) {
+        return std::make_tuple(a->portions_for_operator, a->staking_requirement - a->total_reserved, a->staking_requirement - a->total_contributed, a->service_node_pubkey)
+             < std::make_tuple(b->portions_for_operator, b->staking_requirement - b->total_reserved, b->staking_requirement - b->total_contributed, b->service_node_pubkey); });
+
+    mstch::map page_context;
+    generate_service_node_mapping(page_context, "service_nodes_active", on_homepage, active);
+    generate_service_node_mapping(page_context, "service_nodes_inactive", on_homepage, inactive);
+    generate_service_node_mapping(page_context, "service_nodes_awaiting", on_homepage, awaiting);
 
     if (on_homepage)
     {
@@ -747,7 +768,7 @@ std::string make_service_node_expiry_time_str(COMMAND_RPC_GET_SERVICE_NODES::res
     time_t expiry_time = calculate_service_node_expiry_timestamp(expiry_height);
     get_human_readable_timestamp(expiry_time, &result);
     if (expiry_time_relative)
-      *expiry_time_relative = std::string(get_human_time_ago(expiry_time, time(nullptr)));
+      *expiry_time_relative = get_human_time_ago(expiry_time, time(nullptr));
   }
   else
   {
@@ -811,8 +832,8 @@ render_quorum_states_html(bool add_header_and_footer)
     uint64_t block_height = core_storage->get_current_blockchain_height() - 1;
     if (on_homepage)
     {
-      if (block_height >= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS)
-        block_height -= service_nodes::quorum_cop::REORG_SAFETY_BUFFER_IN_BLOCKS;
+      if (block_height >= service_nodes::REORG_SAFETY_BUFFER_IN_BLOCKS)
+        block_height -= service_nodes::REORG_SAFETY_BUFFER_IN_BLOCKS;
       else
         block_height = 0;
     }
@@ -911,7 +932,7 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
     uint64_t height = core_storage->get_current_blockchain_height();
 
     // number of last blocks to show
-    uint64_t no_of_last_blocks = std::min(no_blocks_on_index + 1, height);
+    uint64_t no_of_last_blocks = std::min(no_blocks_on_index, height);
 
     // initalise page tempate map with basic info about blockchain
     mstch::map context {
@@ -1139,7 +1160,7 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
                 txd_map.insert({"height"    , i});
                 txd_map.insert({"blk_hash"  , blk_hash_str});
                 txd_map.insert({"age"       , age.first});
-                txd_map.insert({"is_ringct" , (tx.version > 1)});
+                txd_map.insert({"is_ringct" , tx.version >= cryptonote::txversion::v2_ringct});
                 txd_map.insert({"rct_type"  , tx.rct_signatures.type});
                 txd_map.insert({"blk_size"  , blk_size_str});
 
@@ -1408,8 +1429,8 @@ mempool(bool add_header_and_footer = false, uint64_t no_of_mempool_tx = 25)
                 {"timestamp"       , mempool_tx.timestamp_str},
                 {"age"             , age_str},
                 {"hash"            , pod_to_hex(mempool_tx.tx_hash)},
-                {"fee"             , mempool_tx.fee_micro_str},
-                {"payed_for_kB"    , mempool_tx.payed_for_kB_micro_str},
+                {"fee"             , mempool_tx.fee_str},
+                {"payed_for_kB"    , mempool_tx.payed_for_kB_str},
                 {"lok_inputs"      , mempool_tx.lok_inputs_str},
                 {"lok_outputs"     , mempool_tx.lok_outputs_str},
                 {"no_inputs"       , mempool_tx.no_inputs},
@@ -1598,7 +1619,7 @@ show_block(uint64_t _blk_height)
 
     // initalise page tempate map with basic info about blockchain
 
-    string blk_pow_hash_str = pod_to_hex(get_block_longhash(blk, _blk_height));
+    string blk_pow_hash_str = pod_to_hex(get_block_longhash(core_storage, blk, _blk_height, 0));
     uint64_t blk_difficulty = core_storage->get_db().get_block_difficulty(_blk_height);
 
     mstch::map context {
@@ -1708,78 +1729,8 @@ show_service_node(const std::string &service_node_pubkey)
       return std::string("Can't get service node pubkey or couldn't find as registered service node: " + service_node_pubkey);
     }
 
-    mstch::map page_context {};
-    COMMAND_RPC_GET_SERVICE_NODES::response::entry const *entry = &response.service_node_states[0];
-
-    // Make metadata render data
-    static std::string friendly_uptime_proof_not_received = "Not Received";
-    int operator_cut_in_percent = portions_to_percent(entry->portions_for_operator);
-
-    page_context["public_key"]           = entry->service_node_pubkey;
-    page_context["last_reward_at_block"] = entry->last_reward_block_height;
-    page_context["last_reward_at_block_tx_index"] = entry->last_reward_transaction_index;
-    page_context["total_contributed"]    = print_money(entry->total_contributed);
-    page_context["total_reserved"]       = print_money(entry->total_reserved);
-    page_context["staking_requirement"]  = print_money(entry->staking_requirement);
-    page_context["operator_cut"]         = operator_cut_in_percent;
-    page_context["operator_address"]     = entry->operator_address;
-    page_context["operator_address"]     = entry->operator_address;
-    page_context["last_uptime_proof"]    = (entry->last_uptime_proof == 0) ? friendly_uptime_proof_not_received : get_age(server_timestamp, entry->last_uptime_proof).first;
-    page_context["num_contributors"]     = (int) entry->contributors.size();
-    page_context["register_height"]      = entry->registration_height;
-
-    // Make contributor render data
-    char const service_node_contributors_array_id[] = "service_node_contributors_array";
-    page_context.emplace(service_node_contributors_array_id, mstch::array{});
-    mstch::array& contributors = boost::get<mstch::array>(page_context[service_node_contributors_array_id]);
-    for (COMMAND_RPC_GET_SERVICE_NODES::response::contributor const &contributor : entry->contributors)
-    {
-      mstch::map array_entry
-      {
-        {"address",  contributor.address},
-        {"amount",   print_money(contributor.amount)},
-        {"reserved", print_money(contributor.reserved)},
-      };
-
-      contributors.push_back(array_entry);
-    }
-
-    char const service_node_registered_text_id[] = "service_node_registered_text";
-    if (entry->total_contributed == entry->staking_requirement)
-    {
-      bool node_scheduled_for_expiry = true;
-      if (service_node_entry_is_infinite_staking(entry))
-        node_scheduled_for_expiry = (entry->requested_unlock_height > 0);
-
-      std::string str = "This service node is registered and active on the network. ";
-      if (node_scheduled_for_expiry)
-      {
-        std::string expiry_time_relative;
-        std::string expiry_time_str = make_service_node_expiry_time_str(entry, &expiry_time_relative);
-        str += "It is scheduled to expire on the ";
-        str += expiry_time_str;
-        str += " or ";
-        str += expiry_time_relative;
-      }
-      else
-      {
-        str += "The service node is staking infinitely, no unlock has been requested yet.";
-      }
-
-      page_context[service_node_registered_text_id] = str;
-    }
-    else
-    {
-      char buf[192];
-      buf[0] = 0;
-      uint64_t remaining_contribution = entry->staking_requirement - entry->total_reserved;
-
-      snprintf(buf, sizeof(buf),
-          "This service node is awaiting to be registered and has: %s loki to be contributed remaining",
-          print_money(remaining_contribution).c_str());
-
-      page_context[service_node_registered_text_id] = std::string(buf);
-    }
+    mstch::map page_context{};
+    set_service_node_fields(page_context, response.service_node_states[0]);
 
     add_css_style(page_context);
     return mstch::render(template_file["service_node_detail"], page_context);
@@ -2319,7 +2270,7 @@ show_ringmemberstx_jsonhex(string const& tx_hash_str)
     tx_json["hash"] = tx_hash_str;
     tx_json["hex"]  = tx_hex;
     tx_json["nettype"] = static_cast<size_t>(nettype);
-    tx_json["is_ringct"] = (tx.version > 1);
+    tx_json["is_ringct"] = tx.version >= cryptonote::txversion::v2_ringct;
     tx_json["rct_type"] = tx.rct_signatures.type;
 
     tx_json["_comment"] = "Just a placeholder for some comment if needed later";
@@ -2868,7 +2819,7 @@ show_my_outputs(string tx_hash_str,
         }
 
         // if mine output has RingCT, i.e., tx version is 2
-        if (mine_output && tx.version == 2)
+        if (mine_output && tx.version >= cryptonote::txversion::v2_ringct)
         {
             // cointbase txs have amounts in plain sight.
             // so use amount from ringct, only for non-coinbase txs
@@ -3168,7 +3119,7 @@ show_my_outputs(string tx_hash_str,
                 }
 
 
-                if (mine_output && mixin_tx.version == 2)
+                if (mine_output && mixin_tx.version >= cryptonote::txversion::v2_ringct)
                 {
                     // cointbase txs have amounts in plain sight.
                     // so use amount from ringct, only for non-coinbase txs
@@ -3237,11 +3188,12 @@ show_my_outputs(string tx_hash_str,
                         // in key image without spend key, so we just use all
                         // for regular/old txs there must be also a match
                         // in amounts, not only in output public keys
-                        if (mixin_tx.version < 2 && amount == in_key.amount)
+                        if (mixin_tx.version < cryptonote::txversion::v2_ringct)
                         {
-                            sum_mixin_lok += amount;
+                            if (amount == in_key.amount)
+                                sum_mixin_lok += amount;
                         }
-                        else if (mixin_tx.version == 2) // ringct
+                        else // ringct
                         {
                             sum_mixin_lok += amount;
                             ringct_amount += amount;
@@ -6010,7 +5962,7 @@ json_outputs(string tx_hash_str,
         }
 
         // if mine output has RingCT, i.e., tx version is 2
-        if (mine_output && tx.version == 2)
+        if (mine_output && tx.version >= cryptonote::txversion::v2_ringct)
         {
             // cointbase txs have amounts in plain sight.
             // so use amount from ringct, only for non-coinbase txs
@@ -6472,7 +6424,7 @@ find_our_outputs(
             }
 
             // if mine output has RingCT, i.e., tx version is 2
-            if (mine_output && tx.version == 2)
+            if (mine_output && tx.version >= cryptonote::txversion::v2_ringct)
             {
                 // cointbase txs have amounts in plain sight.
                 // so use amount from ringct, only for non-coinbase txs
@@ -6713,6 +6665,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             {"tx_blk_height"         , tx_blk_height},
             {"tx_size"               , fmt::format("{:0.4f}", tx_size)},
             {"tx_fee"                , lokeg::lok_amount_to_str(txd.fee, "{:0.9f}", false)},
+            {"tx_fee_short"          , lokeg::lok_amount_to_str(txd.fee, "{:0.4f}", false)},
             {"tx_fee_micro"          , lokeg::lok_amount_to_str(txd.fee*1e6, "{:0.4f}", false)},
             {"payed_for_kB"          , fmt::format("{:0.9f}", payed_for_kB)},
             {"tx_version"            , static_cast<uint64_t>(txd.version)},
@@ -6732,7 +6685,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             {"with_ring_signatures"  , static_cast<bool>(
                                                with_ring_signatures)},
             {"tx_json"               , tx_json},
-            {"is_ringct"             , (tx.version > 1)},
+            {"is_ringct"             , tx.version >= cryptonote::txversion::v2_ringct},
             {"rct_type"              , tx.rct_signatures.type},
             {"has_error"             , false},
             {"error_msg"             , string("")},
@@ -6742,41 +6695,66 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             {"construction_time"     , string {}},
     };
 
-    if (tx.version >= transaction::version_3_per_output_unlock_times)
+    if (tx.version >= cryptonote::txversion::v3_per_output_unlock_times)
     {
-        tx_extra_service_node_deregister   deregister;
         tx_extra_service_node_register     register_;
         cryptonote::account_public_address contributor;
-        if (tx.get_type() == cryptonote::transaction::type_deregister)
+        if (tx.type == cryptonote::txtype::state_change)
         {
-            context["have_deregister_info"] = true;
-            if (get_service_node_deregister_from_tx_extra(tx.extra, deregister))
-            {
-              context["deregister_service_node_index"]   = deregister.service_node_index;
-              context["deregister_block_height"]         = deregister.block_height;
+            // Getting the hard fork version here is a bit tricker, so just try with v12 then if it
+            // fails, try with v11 instead (to capture older deregs).  Both still give back a
+            // state_change (for the older deregs, it translates the dereg_old into a state_change
+            // deregistration transparently).
+            tx_extra_service_node_state_change state_change;
+            context["is_state_change"] = true;
+            bool new_style = get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_12_checkpointing);
+            if (new_style || get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_11_infinite_staking)) {
+                if (new_style)
+                    context["state_change_new_style"] = true;
+                context["state_change_service_node_index"] = state_change.service_node_index;
+                context["state_change_block_height"] = state_change.block_height;
+                context[
+                    state_change.state == service_nodes::new_state::deregister ? "state_change_deregister" :
+                    state_change.state == service_nodes::new_state::decommission ? "state_change_decommission" :
+                    state_change.state == service_nodes::new_state::recommission ? "state_change_recommission" :
+                    state_change.state == service_nodes::new_state::ip_change_penalty ? "state_change_ip_change_penalty" :
+                    "state_change_unknown"] = true;
 
-              char const vote_array_id[] = "deregister_vote_array";
-              context.emplace(vote_array_id, mstch::array());
-
-              mstch::array& vote_array = boost::get<mstch::array>(context[vote_array_id]);
-              vote_array.reserve(deregister.votes.size());
-
-              for (tx_extra_service_node_deregister::vote &vote : deregister.votes)
-              {
-                mstch::map entry
+                std::vector<std::string> quorum_nodes;
+                // Try to get the quorum state to figure out the vote casters & target; unless very
+                // recent, this requires lokid to be started with --store-quorum-history
                 {
-                  {"deregister_voters_quorum_index", vote.voters_quorum_index},
-                  {"deregister_signature",           pod_to_hex(vote.signature)},
-                };
+                    COMMAND_RPC_GET_QUORUM_STATE::response response = {};
+                    rpc.get_quorum_state(response, state_change.block_height);
+                    if (response.status == "OK") {
+                        if (state_change.service_node_index < response.nodes_to_test.size())
+                            context["state_change_service_node_pubkey"] = response.nodes_to_test[state_change.service_node_index];
+                        quorum_nodes = std::move(response.quorum_nodes);
+                        context["state_change_have_pubkey_info"] = true;
+                    }
+                }
 
-                vote_array.push_back(entry);
-              }
+                char const vote_array_id[] = "state_change_vote_array";
+                context.emplace(vote_array_id, mstch::array());
+
+                mstch::array& vote_array = boost::get<mstch::array>(context[vote_array_id]);
+                vote_array.reserve(state_change.votes.size());
+
+                for (tx_extra_service_node_state_change::vote &vote : state_change.votes)
+                {
+                    mstch::map entry
+                    {
+                        {"state_change_voters_quorum_index", vote.validator_index},
+                        {"state_change_signature",           pod_to_hex(vote.signature)},
+                    };
+                    if (vote.validator_index < quorum_nodes.size())
+                        entry["state_change_voter_pubkey"] = quorum_nodes[vote.validator_index];
+
+                    vote_array.push_back(entry);
+                }
             }
-            else
-            {
-              static std::string unknown = "??";
-              context["deregister_service_node_index"] = unknown;
-              context["deregister_block_height"]       = unknown;
+            else {
+                context["state_change_unknown"] = std::string{"unknown"};
             }
         }
         else if (get_service_node_register_from_tx_extra(tx.extra, register_))
@@ -6791,7 +6769,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             context["register_service_node_pubkey"]   = extract_sn_pubkey(tx.extra);
             context["register_portions_for_operator"] = portions_to_percent(register_.m_portions_for_operator);
             context["register_expiration_timestamp_friendly"]  = timestamp_to_str_gm(register_.m_expiration_timestamp);
-            context["register_expiration_timestamp_relative"]  = std::string(get_human_time_ago(register_.m_expiration_timestamp, time(nullptr)));
+            context["register_expiration_timestamp_relative"]  = get_human_time_ago(register_.m_expiration_timestamp, time(nullptr));
             context["register_expiration_timestamp"]  = register_.m_expiration_timestamp;
             context["register_signature"]             = pod_to_hex(register_.m_service_node_signature);
 
@@ -7328,7 +7306,7 @@ get_tx_details(const transaction& tx,
     txd.signatures = tx.signatures;
 
     // get tx version
-    txd.version = tx.version;
+    txd.version = static_cast<std::underlying_type<cryptonote::txversion>::type>(tx.version);
 
     // get unlock time
     txd.unlock_time = tx.unlock_time;

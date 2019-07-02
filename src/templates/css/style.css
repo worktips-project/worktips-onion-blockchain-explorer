@@ -196,3 +196,34 @@ div#decoded-inputs{
 input#toggle-1[type=checkbox]:checked ~ div#decoded-inputs {
     display: block;
 }
+
+.Table.metadata td {
+    text-align: left;
+}
+
+.Table.metadata label {
+    text-align: right;
+    display: inline-block;
+    width: 50%;
+}
+
+
+td.sn-more {
+    font-style: italic;
+    font-size: 125%;
+}
+
+p.state-change-pubkey {
+    font-size: 120%;
+}
+th.voter-signature, td.voter-signature {
+    max-width: 300px;
+}
+td.voter-signature {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.omg {
+    font-weight: bold;
+}

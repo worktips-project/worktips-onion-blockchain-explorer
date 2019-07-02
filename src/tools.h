@@ -379,7 +379,10 @@ bytes_to_hex(char const *bytes, int len);
 void
 get_human_readable_timestamp(uint64_t ts, std::string *result);
 
-char const *
+std::string
+get_human_timespan(time_t dt);
+
+std::string
 get_human_time_ago(time_t t, time_t now);
 
 std::string
