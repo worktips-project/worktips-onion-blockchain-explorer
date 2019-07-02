@@ -67,19 +67,28 @@
         <h2>Service Node IP Change Metadata</h2>
         {{/state_change_ip_change_penalty}}
         <div class="TitleDivider"></div>
+        {{#state_change_have_pubkey_info}}
+        <p class="state-change-pubkey">Service Node Public Key: <a href="/service_node/{{state_change_service_node_pubkey}}">{{state_change_service_node_pubkey}}</a></p>
+        {{/state_change_have_pubkey_info}}
         <p>Service Node Index: {{state_change_service_node_index}}</p>
         <p>Block Height: <a href="/block/{{state_change_block_height}}">{{state_change_block_height}}</a></p>
 
         <table class="Table">
             <tr class="TableHeader">
-                <td>Voters Quorum Index</td>
-                <td>Signature</td>
+                <th class="voter-index">Voters Quorum Index</th>
+                {{#state_change_have_pubkey_info}}
+                <th class="voter-pubkey">Voter Public Key</th>
+                {{/state_change_have_pubkey_info}}
+                <th class="voter-signature">Signature</th>
             </tr>
 
             {{#state_change_vote_array}}
             <tr>
-                <td>{{state_change_voters_quorum_index}}</td>
-                <td>{{state_change_signature}}</td>
+                <td class="voter-index">{{state_change_voters_quorum_index}}</td>
+                {{#state_change_have_pubkey_info}}
+                <td class="voter-pubkey"><a href="/service_node/{{state_change_voter_pubkey}}">{{state_change_voter_pubkey}}</a></td>
+                {{/state_change_have_pubkey_info}}
+                <td class="voter-signature" title="{{state_change_signature}}">{{state_change_signature}}</td>
             </tr>
             {{/state_change_vote_array}}
         </table>

@@ -6709,7 +6709,8 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             context["is_state_change"] = true;
             bool new_style = get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_12_checkpointing);
             if (new_style || get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_11_infinite_staking)) {
-                context["state_change_new_style"] = new_style;
+                if (new_style)
+                    context["state_change_new_style"] = true;
                 context["state_change_service_node_index"] = state_change.service_node_index;
                 context["state_change_block_height"] = state_change.block_height;
                 context[
@@ -6718,6 +6719,20 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
                     state_change.state == service_nodes::new_state::recommission ? "state_change_recommission" :
                     state_change.state == service_nodes::new_state::ip_change_penalty ? "state_change_ip_change_penalty" :
                     "state_change_unknown"] = true;
+
+                std::vector<std::string> quorum_nodes;
+                // Try to get the quorum state to figure out the vote casters & target; unless very
+                // recent, this requires lokid to be started with --store-quorum-history
+                {
+                    COMMAND_RPC_GET_QUORUM_STATE::response response = {};
+                    rpc.get_quorum_state(response, state_change.block_height);
+                    if (response.status == "OK") {
+                        if (state_change.service_node_index < response.nodes_to_test.size())
+                            context["state_change_service_node_pubkey"] = response.nodes_to_test[state_change.service_node_index];
+                        quorum_nodes = std::move(response.quorum_nodes);
+                        context["state_change_have_pubkey_info"] = true;
+                    }
+                }
 
                 char const vote_array_id[] = "state_change_vote_array";
                 context.emplace(vote_array_id, mstch::array());
@@ -6730,8 +6745,10 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
                     mstch::map entry
                     {
                         {"state_change_voters_quorum_index", vote.validator_index},
-                            {"state_change_signature",           pod_to_hex(vote.signature)},
+                        {"state_change_signature",           pod_to_hex(vote.signature)},
                     };
+                    if (vote.validator_index < quorum_nodes.size())
+                        entry["state_change_voter_pubkey"] = quorum_nodes[vote.validator_index];
 
                     vote_array.push_back(entry);
                 }
