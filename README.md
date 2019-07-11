@@ -1,46 +1,38 @@
-# Onion Loki Blockchain Explorer
+# Loki Onion Blockchain Explorer
 
-Currently available Loki blockchain explorers have several limitations which are of 
-special importance to privacy-oriented users:
+#### Features 
 
- - they use JavaScript,
- - have images which might be used for [cookieless tracking](http://lucb1e.com/rp/cookielesscookies/),
- - track users activates through google analytics,
- - are closed sourced,
- - are not available as hidden services,
- - do not support Loki testnet nor stagenet networks,
- - have limited JSON API.
+**Code features**
 
-
-In this example, these limitations are addressed by development of
-an Onion Loki Blockchain Explorer. The example not only shows how to use 
-Loki C++ libraries, but also demonstrates how to use:
-
- - [crow](https://github.com/ipkn/crow) - C++ micro web framework
- - [mstch](https://github.com/no1msd/mstch) - C++ {{mustache}} templates
- - [json](https://github.com/nlohmann/json) - JSON for Modern C++
- - [fmt](https://github.com/fmtlib/fmt) - Small, safe and fast string formatting library
-
-## Onion Loki Blockchain Explorer features
  - no cookies, no web analytics trackers, no images,
  - by default no JavaScript, but can be enabled for client side decoding and proving transactions,
  - open sourced,
  - made fully in C++,
- - showing encrypted payments ID,
- - showing ring signatures,
- - showing transaction extra field,
- - showing public components of Loki addresses,
+ 
+**Service Nodes**
+ 
+ - shows current sorted Service Node list
+ - shows current quorum
+ - shows staking requirement, last uptime proof, last reward height, and decommission credits
+ - shows inactive and decommissioned Service Nodes
+ - shows List of nodes to be tested by current quorum
+ 
+ **Blocks and transactions**
+ 
+ - shows encrypted payments ID,
+ - shows ring signatures,
+ - shows transaction extra field,
+ - shows public components of Loki addresses,
  - decoding which outputs and mixins belong to the given Loki address and viewkey,
  - can prove that you send Loki to someone,
  - detailed information about mixins, such as, mixins' age, timescale, mixin of mixins,
- - showing number of amount output indices,
+ - shows number of amount output indices,
  - support Loki testnet, stagenet network,
  - tx checker and pusher for online pushing of transactions,
- - estimate possible spendings based on address and viewkey,
+ - can estimate possible spends based on address and viewkey,
  - can provide total amount of all miner fees,
- - decoding encrypted payment id,
- - decoding outputs and proving txs sent to sub-address.
-
+ - can decode encrypted payment id,
+ - can decode outputs and proving txs sent to sub-address.
 
 ## Development branch
 
@@ -82,10 +74,10 @@ as follows:
 cd ~
 
 # download the source code
-git clone https://github.com/loki-project/onion-loki-blockchain-explorer.git
+git clone https://github.com/loki-project/loki-onion-blockchain-explorer.git
 
 # enter the downloaded sourced code folder
-cd onion-loki-blockchain-explorer
+cd loki-onion-blockchain-explorer
 
 # make a build folder and enter it
 mkdir build && cd build
@@ -184,10 +176,10 @@ Example usage, defined as bash aliases.
 
 ```bash
 # for mainnet explorer
-alias lokblocksmainnet='~/onion-loki-blockchain-explorer/build/lokblocks    --port 8081 --testnet-url "http://139.162.32.245:8082" --enable-pusher --enable-emission-monitor'
+alias lokblocksmainnet='~/loki-onion-blockchain-explorer/build/lokblocks    --port 8081 --testnet-url "http://139.162.32.245:8082" --enable-pusher --enable-emission-monitor'
 
 # for testnet explorer
-alias lokblockstestnet='~/onion-loki-blockchain-explorer/build/lokblocks -t --port 8082 --mainnet-url "http://139.162.32.245:8081" --enable-pusher --enable-emission-monitor'
+alias lokblockstestnet='~/loki-onion-blockchain-explorer/build/lokblocks -t --port 8082 --mainnet-url "http://139.162.32.245:8081" --enable-pusher --enable-emission-monitor'
 ```
 
 These are aliases similar to those used for http://139.162.32.245:8081/ and http://139.162.32.245:8082/, respectively.
