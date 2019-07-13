@@ -62,6 +62,7 @@
 #define TMPL_SERVICE_NODES          TMPL_DIR "/service_nodes.html"
 #define TMPL_SERVICE_NODE_DETAIL    TMPL_DIR "/service_node_detail.html"
 #define TMPL_QUORUM_STATES          TMPL_DIR "/quorum_states.html"
+#define TMPL_CHECKPOINTS            TMPL_DIR "/checkpoints.html"
 
 #define JS_JQUERY   TMPL_DIR "/js/jquery.min.js"
 #define JS_CRC32    TMPL_DIR "/js/crc32.js"
@@ -350,12 +351,12 @@ struct tx_details
     ~tx_details() {};
 };
 
-typedef struct ServiceNodeContext
+struct ServiceNodeContext
 {
     std::string html_context;
     std::string html_full_context;
     int         num_entries_on_front_page;
-} QuorumStateContext;
+};
 
 class page
 {
@@ -365,7 +366,6 @@ static const bool FULL_AGE_FORMAT {true};
 MicroCore* mcore;
 Blockchain* core_storage;
 ServiceNodeContext snode_context;
-QuorumStateContext quorum_state_context;
 rpccalls rpc;
 
 atomic<time_t> server_timestamp;
@@ -395,6 +395,8 @@ bool enable_autorefresh_option;
 uint64_t no_of_mempool_tx_of_frontpage;
 uint64_t no_blocks_on_index;
 uint64_t mempool_info_timeout;
+uint64_t no_quorum_entries_on_frontpage;
+uint32_t no_checkpoint_entries_on_frontpage;
 
 string testnet_url;
 string stagenet_url;
@@ -479,8 +481,8 @@ page(MicroCore* _mcore,
     snode_context                           = {};
     snode_context.num_entries_on_front_page = 10;
 
-    quorum_state_context                           = {};
-    quorum_state_context.num_entries_on_front_page = 1;
+    no_quorum_entries_on_frontpage = 1;
+    no_checkpoint_entries_on_frontpage = 3;
 
     no_of_mempool_tx_of_frontpage = 25;
 
@@ -497,7 +499,9 @@ page(MicroCore* _mcore,
     template_file["mempool_full"]    = get_full_page(template_file["mempool"]);
     template_file["service_nodes"]   = lokeg::read(TMPL_SERVICE_NODES);
     template_file["quorum_states"]   = lokeg::read(TMPL_QUORUM_STATES);
-    template_file["quorum_states_full"]  = get_full_page(lokeg::read(TMPL_QUORUM_STATES));
+    template_file["quorum_states_full"]  = get_full_page(template_file["quorum_states"]);
+    template_file["checkpoints"]         = lokeg::read(TMPL_CHECKPOINTS);
+    template_file["checkpoints_full"]    = get_full_page(template_file["checkpoints"]);
     template_file["service_nodes_full"]  = get_full_page(lokeg::read(TMPL_SERVICE_NODES));
     template_file["service_node_detail"] = get_full_page(lokeg::read(TMPL_SERVICE_NODE_DETAIL));
     template_file["block"]           = get_full_page(lokeg::read(TMPL_BLOCK));
@@ -781,15 +785,18 @@ std::string make_service_node_expiry_time_str(COMMAND_RPC_GET_SERVICE_NODES::res
   return result;
 }
 
-void gather_sn_data(const std::vector<std::string>& nodes, const sn_entry_map& sn_map, mstch::array& array)
+mstch::array gather_sn_data(const std::vector<crypto::public_key> &nodes, const sn_entry_map &sn_map)
 {
+    mstch::array data;
+    data.reserve(nodes.size());
     static const std::string failed_entry = "--";
 
-    for (const std::string& pub_key : nodes)
-    {
-        mstch::map array_entry { {"public_key", pub_key}, };
+    for (size_t i = 0; i < nodes.size(); i++) {
+        const auto &pub_key = nodes[i];
+        const std::string pk_str = pod_to_hex(pub_key);
+        mstch::map array_entry{{"public_key", pk_str}, {"quorum_index", std::to_string(i)}};
 
-        auto it = sn_map.find(pub_key);
+        auto it = sn_map.find(pk_str);
 
         if (it == sn_map.end())
         {
@@ -806,25 +813,79 @@ void gather_sn_data(const std::vector<std::string>& nodes, const sn_entry_map& s
             array_entry.emplace("expiration_date",          expiration_time_str);
             array_entry.emplace("expiration_time_relative", expiration_time_relative);
         }
-        array.push_back(array_entry);
+        data.push_back(std::move(array_entry));
     }
 
+    return data;
+}
+
+mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, size_t num_quorums, service_nodes::quorum_type type = service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value) {
+
+    COMMAND_RPC_GET_QUORUM_STATE::response response = {};
+    rpc.get_quorum_state(response, start_height, end_height, static_cast<uint8_t>(type));
+
+    sn_entry_map pk2sninfo;
+    {
+        COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
+        rpc.get_service_node(sn_response, {});
+
+        for (const auto& entry : sn_response.service_node_states)
+            pk2sninfo.emplace(entry.service_node_pubkey, entry);
+    }
+
+    std::vector<std::pair<uint8_t, std::string>> quorum_types;
+    if (type == service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value || type == service_nodes::quorum_type::obligations)
+        quorum_types.emplace_back(static_cast<uint8_t>(service_nodes::quorum_type::obligations), "obligations");
+    if (type == service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value || type == service_nodes::quorum_type::checkpointing)
+        quorum_types.emplace_back(static_cast<uint8_t>(service_nodes::quorum_type::checkpointing), "checkpointing");
+
+    mstch::map page_context {};
+
+    for (const auto &quorum_type : quorum_types) {
+        mstch::array quorum_array;
+        quorum_array.reserve(num_quorums);
+        page_context.emplace(quorum_type.second + "_quorum_array", std::move(quorum_array));
+    }
+
+    for (const auto &quorum_type : quorum_types) {
+        auto &quorum_array = boost::get<mstch::array>(page_context[quorum_type.second + "_quorum_array"]);
+        for (const auto &entry : response.quorums) {
+            if (entry.quorum_type != quorum_type.first)
+                continue;
+
+            mstch::map quorum_part;
+            quorum_part.emplace("quorum_height", entry.height);
+            auto validators = gather_sn_data(entry.quorum.validators, pk2sninfo),
+                 workers = gather_sn_data(entry.quorum.workers, pk2sninfo);
+            quorum_part.emplace("quorum_validators_size", validators.size());
+            quorum_part.emplace("quorum_validators", std::move(validators));
+            quorum_part.emplace("quorum_workers_size", workers.size());
+            quorum_part.emplace("quorum_workers", std::move(workers));
+
+            quorum_array.push_back(std::move(quorum_part));
+
+            if (quorum_array.size() >= num_quorums)
+                break;
+        }
+        page_context.emplace(quorum_type.second + "_quorum_array_size", quorum_array.size());
+    }
+    return page_context;
+}
+
+std::string render_single_quorum_html(service_nodes::quorum_type qtype, uint64_t height) {
+    auto page_context = get_quorum_state_context(height, height, 1, qtype);
+
+    if (qtype == service_nodes::quorum_type::checkpointing)
+
+    add_css_style(page_context);
+    return mstch::render(template_file["quorum_states_full"], page_context);
 }
 
 std::string
 render_quorum_states_html(bool add_header_and_footer)
 {
     bool on_homepage             = !add_header_and_footer;
-    size_t num_quorums_to_render = 30;
-    if (on_homepage)
-    {
-      num_quorums_to_render = quorum_state_context.num_entries_on_front_page;
-    }
-
-    mstch::map page_context {};
-    page_context["quorum_array"] = mstch::array();
-    mstch::array& quorum_array   = boost::get<mstch::array>(page_context["quorum_array"]);
-    quorum_array.reserve(num_quorums_to_render);
+    size_t num_quorums_to_render = on_homepage ? no_quorum_entries_on_frontpage : 30;
 
     // NOTE: If we're on the homepage, only display the latest height being
     // voted for. This is not the latest height of the blockchain due to the
@@ -832,65 +893,74 @@ render_quorum_states_html(bool add_header_and_footer)
     uint64_t block_height = core_storage->get_current_blockchain_height() - 1;
     if (on_homepage)
     {
-      if (block_height >= service_nodes::REORG_SAFETY_BUFFER_IN_BLOCKS)
-        block_height -= service_nodes::REORG_SAFETY_BUFFER_IN_BLOCKS;
+      if (block_height >= service_nodes::REORG_SAFETY_BUFFER_BLOCKS_POST_HF12)
+        block_height -= service_nodes::REORG_SAFETY_BUFFER_BLOCKS_POST_HF12;
       else
         block_height = 0;
     }
+    uint64_t start_height = block_height <= num_quorums_to_render ? 0 : block_height - num_quorums_to_render - 1;
+    // +3 because we need to get a checkpoint quorum which is only every 4 blocks; when we overreach
+    // we just cut off at the intended number when building the array below.
+	uint64_t end_height = block_height + 3;
 
-    COMMAND_RPC_GET_QUORUM_STATE_BATCHED::response batched_response = {};
-    rpc.get_quorum_state_batched(batched_response, block_height - num_quorums_to_render, block_height);
-
-    COMMAND_RPC_GET_SERVICE_NODES::response sn_response = {};
-    rpc.get_service_node(sn_response, {});
-
-    sn_entry_map pk2sninfo;
-
-    for (const auto& entry : sn_response.service_node_states)
-    {
-        pk2sninfo.insert({entry.service_node_pubkey, entry});
-    }
-
-    // TODO(doyle): Use std::min as workaround, sigh ... fix off by one pls or something pls.
-    for (int i = 0; i < std::min(num_quorums_to_render, batched_response.quorum_entries.size()); ++i)
-    {
-        const auto& entry = batched_response.quorum_entries[i];
-        const uint64_t height = entry.height;
-
-        mstch::map quorum_part;
-        quorum_part["quorum_height"] = height;
-
-        char const quorum_node_array_id[]       = "quorum_nodes_array";
-        char const nodes_to_test_array_id[]     = "nodes_to_test_array";
-        quorum_part[quorum_node_array_id]       = mstch::array();
-        quorum_part[nodes_to_test_array_id]     = mstch::array();
-
-        quorum_part["quorum_nodes_array_size"]  = entry.quorum_nodes.size();
-        quorum_part["nodes_to_test_array_size"] = entry.nodes_to_test.size();
-
-        mstch::array& quorum_node_array   = boost::get<mstch::array>(quorum_part[quorum_node_array_id]);
-        mstch::array& nodes_to_test_array = boost::get<mstch::array>(quorum_part[nodes_to_test_array_id]);
-        quorum_node_array.reserve(entry.quorum_nodes.size());
-        nodes_to_test_array.reserve(entry.nodes_to_test.size());
-
-        gather_sn_data(entry.quorum_nodes, pk2sninfo, quorum_node_array);
-        gather_sn_data(entry.nodes_to_test, pk2sninfo, nodes_to_test_array);
-
-        quorum_array.push_back(quorum_part);
-    }
+    auto page_context = get_quorum_state_context(start_height, end_height, num_quorums_to_render);
 
     if (on_homepage)
-    {
-        quorum_state_context.html_context = mstch::render(template_file["quorum_states"], page_context);
-        return quorum_state_context.html_context;
-    }
-    else
-    {
-        add_css_style(page_context);
-        quorum_state_context.html_full_context = mstch::render(template_file["quorum_states_full"], page_context);
-        return quorum_state_context.html_full_context;
-    }
+        return mstch::render(template_file["quorum_states"], page_context);
+
+    add_css_style(page_context);
+    return mstch::render(template_file["quorum_states_full"], page_context);
 }
+
+std::string
+render_checkpoints_html(bool add_header_and_footer)
+{
+    bool on_homepage = !add_header_and_footer;
+    uint32_t num_checkpoints = on_homepage ? no_checkpoint_entries_on_frontpage : 50;
+
+
+    COMMAND_RPC_GET_CHECKPOINTS::response response = {};
+    rpc.get_checkpoints(response, num_checkpoints);
+
+    mstch::array checkpoints;
+    checkpoints.reserve(response.checkpoints.size());
+    for (const auto &cp : response.checkpoints) {
+        mstch::map checkpoint;
+        checkpoint.emplace("checkpoint_type", checkpoint_t::type_to_string(cp.type));
+        checkpoint.emplace("checkpoint_block_hash", epee::string_tools::pod_to_hex(cp.block_hash));
+        checkpoint.emplace("checkpoint_height", cp.height);
+        checkpoint.emplace("checkpoint_quorum", cp.height - service_nodes::REORG_SAFETY_BUFFER_BLOCKS_POST_HF12);
+        mstch::array signatures;
+        signatures.reserve(cp.signatures.size());
+        mstch::array voter_signed;
+        voter_signed.reserve(service_nodes::CHECKPOINT_QUORUM_SIZE);
+        for (size_t i = 0; i < service_nodes::CHECKPOINT_QUORUM_SIZE; i++)
+            voter_signed.push_back(mstch::map{{"voter_index", i}});
+        for (const auto &s : cp.signatures) {
+            mstch::map sig_info;
+            sig_info.emplace("checkpoint_signer_voter_index", s.voter_index);
+            sig_info.emplace("checkpoint_signature", epee::string_tools::pod_to_hex(s.signature));
+            signatures.push_back(std::move(sig_info));
+            boost::get<mstch::map>(voter_signed[s.voter_index]).emplace("voter_signed", true);
+        }
+        checkpoint.emplace("checkpoint_signatures_size", signatures.size());
+        checkpoint.emplace("checkpoint_signatures", std::move(signatures));
+        checkpoint.emplace("checkpoint_signed_by", std::move(voter_signed));
+
+        checkpoints.push_back(std::move(checkpoint));
+    }
+
+    mstch::map page_context {};
+    page_context.emplace("checkpoint_array_size", checkpoints.size());
+    page_context.emplace("checkpoint_array", std::move(checkpoints));
+
+    if (on_homepage)
+        return mstch::render(template_file["checkpoints"], page_context);
+
+    add_css_style(page_context);
+    return mstch::render(template_file["checkpoints_full"], page_context);
+}
+
 
 /**
  * @brief show recent transactions and mempool
@@ -922,6 +992,11 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
         // get memory pool rendered template
         return mempool(false, no_of_mempool_tx_of_frontpage);
     });
+
+    std::vector<std::pair<std::string, std::future<std::string>>> summary_futures;
+    summary_futures.emplace_back("service_node_summary", std::async(std::launch::async, [&] { return render_service_nodes_html(false /*add_header_and_footer*/); }));
+    summary_futures.emplace_back("quorum_state_summary", std::async(std::launch::async, [&] { return render_quorum_states_html(false /*add_header_and_footer*/); }));
+    summary_futures.emplace_back("checkpoint_summary",   std::async(std::launch::async, [&] { return render_checkpoints_html(false /*add_header_and_footer*/); }));
 
     //get current server timestamp
     server_timestamp = std::time(nullptr);
@@ -1313,27 +1388,11 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
         cerr  << "emission thread not running, skipping." << endl;
     }
 
-
-    // get memory pool rendered template
-    //string mempool_html = mempool(false, no_of_mempool_tx_of_frontpage);
-
-    // service nodes
-    {
-      std::future<std::string> future = std::async(std::launch::async, [&] { return render_service_nodes_html(false /*add_header_and_footer*/); });
-      std::future_status status = future.wait_for(std::chrono::milliseconds(1000));
-
-      if (status == std::future_status::ready)
-        context["service_node_summary"] = future.get();
-    }
-
-    // quorum states
-    {
-      std::future<std::string> future = std::async(std::launch::async, [&] { return render_quorum_states_html(false /*add_header_and_footer*/); });
-      std::future_status status = future.wait_for(std::chrono::milliseconds(1000));
-
-      if (status == std::future_status::ready)
-        context["quorum_state_summary"] = future.get();
-    }
+    // Service nodes, quorums, checkpoint summaries:
+    auto timeout = std::chrono::system_clock::now() + std::chrono::seconds(1);
+    for (auto &sf : summary_futures)
+        if (sf.second.wait_until(timeout) == std::future_status::ready)
+            context.emplace(std::move(sf.first), sf.second.get());
 
     // append html files to the index context map
     context["mempool_info"] = mempool_html;
@@ -6722,14 +6781,17 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
 
                 std::vector<std::string> quorum_nodes;
                 // Try to get the quorum state to figure out the vote casters & target; unless very
-                // recent, this requires lokid to be started with --store-quorum-history
+                // recent, this requires lokid to be started with --store-quorum-history (PR #702)
                 {
                     COMMAND_RPC_GET_QUORUM_STATE::response response = {};
-                    rpc.get_quorum_state(response, state_change.block_height);
-                    if (response.status == "OK") {
-                        if (state_change.service_node_index < response.nodes_to_test.size())
-                            context["state_change_service_node_pubkey"] = response.nodes_to_test[state_change.service_node_index];
-                        quorum_nodes = std::move(response.quorum_nodes);
+                    rpc.get_quorum_state(response, state_change.block_height, state_change.block_height, static_cast<uint8_t>(service_nodes::quorum_type::obligations));
+                    if (response.status == "OK" && !response.quorums.empty()) {
+                        auto &quorum = response.quorums[0].quorum;
+                        if (state_change.service_node_index < quorum.workers.size())
+                            context["state_change_service_node_pubkey"] = pod_to_hex(quorum.workers[state_change.service_node_index]);
+                        quorum_nodes.reserve(quorum.validators.size());
+                        for (auto &v : quorum.validators)
+                            quorum_nodes.push_back(pod_to_hex(v));
                         context["state_change_have_pubkey_info"] = true;
                     }
                 }
