@@ -785,13 +785,14 @@ std::string make_service_node_expiry_time_str(COMMAND_RPC_GET_SERVICE_NODES::res
   return result;
 }
 
-mstch::array gather_sn_data(const std::vector<crypto::public_key> &nodes, const sn_entry_map &sn_map)
+mstch::array gather_sn_data(const std::vector<crypto::public_key> &nodes, const sn_entry_map &sn_map, const size_t sn_display_limit)
 {
     mstch::array data;
     data.reserve(nodes.size());
     static const std::string failed_entry = "--";
 
-    for (size_t i = 0; i < nodes.size(); i++) {
+    const size_t max = std::min(sn_display_limit, nodes.size());
+    for (size_t i = 0; i < max; i++) {
         const auto &pub_key = nodes[i];
         const std::string pk_str = pod_to_hex(pub_key);
         mstch::map array_entry{{"public_key", pk_str}, {"quorum_index", std::to_string(i)}};
@@ -819,7 +820,7 @@ mstch::array gather_sn_data(const std::vector<crypto::public_key> &nodes, const 
     return data;
 }
 
-mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, size_t num_quorums, service_nodes::quorum_type type = service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value) {
+mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, size_t num_quorums, size_t sn_display_limit = 20, service_nodes::quorum_type type = service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value) {
 
     COMMAND_RPC_GET_QUORUM_STATE::response response = {};
     rpc.get_quorum_state(response, start_height, end_height, static_cast<uint8_t>(type));
@@ -833,11 +834,11 @@ mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, 
             pk2sninfo.emplace(entry.service_node_pubkey, entry);
     }
 
-    std::vector<std::pair<uint8_t, std::string>> quorum_types;
+    std::vector<std::pair<service_nodes::quorum_type, std::string>> quorum_types;
     if (type == service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value || type == service_nodes::quorum_type::obligations)
-        quorum_types.emplace_back(static_cast<uint8_t>(service_nodes::quorum_type::obligations), "obligations");
+        quorum_types.emplace_back(service_nodes::quorum_type::obligations, "obligations");
     if (type == service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value || type == service_nodes::quorum_type::checkpointing)
-        quorum_types.emplace_back(static_cast<uint8_t>(service_nodes::quorum_type::checkpointing), "checkpointing");
+        quorum_types.emplace_back(service_nodes::quorum_type::checkpointing, "checkpointing");
 
     mstch::map page_context {};
 
@@ -850,30 +851,42 @@ mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, 
     for (const auto &quorum_type : quorum_types) {
         auto &quorum_array = boost::get<mstch::array>(page_context[quorum_type.second + "_quorum_array"]);
         for (const auto &entry : response.quorums) {
-            if (entry.quorum_type != quorum_type.first)
+            auto qt = static_cast<service_nodes::quorum_type>(entry.quorum_type);
+            if (qt != quorum_type.first)
                 continue;
 
             mstch::map quorum_part;
             quorum_part.emplace("quorum_height", entry.height);
-            auto validators = gather_sn_data(entry.quorum.validators, pk2sninfo),
-                 workers = gather_sn_data(entry.quorum.workers, pk2sninfo);
-            quorum_part.emplace("quorum_validators_size", validators.size());
+            auto validators = gather_sn_data(entry.quorum.validators, pk2sninfo, sn_display_limit);
+            quorum_part.emplace("quorum_validators_size", entry.quorum.validators.size());
+            if (validators.size() < entry.quorum.validators.size())
+                quorum_part.emplace("quorum_validators_more", entry.quorum.validators.size() - validators.size());
             quorum_part.emplace("quorum_validators", std::move(validators));
-            quorum_part.emplace("quorum_workers_size", workers.size());
+
+            sn_display_limit -= validators.size();
+            auto workers = gather_sn_data(entry.quorum.workers, pk2sninfo, sn_display_limit);
+            quorum_part.emplace("quorum_workers_size", entry.quorum.workers.size());
+            if (workers.size() < entry.quorum.workers.size())
+                quorum_part.emplace("quorum_workers_more", entry.quorum.workers.size() - workers.size());
             quorum_part.emplace("quorum_workers", std::move(workers));
+
+            if (qt == service_nodes::quorum_type::checkpointing)
+                quorum_part.emplace("quorum_block_height", entry.height - service_nodes::REORG_SAFETY_BUFFER_BLOCKS_POST_HF12);
 
             quorum_array.push_back(std::move(quorum_part));
 
             if (quorum_array.size() >= num_quorums)
                 break;
         }
+        // Reverse order because it makes much more sense to display the most recent quorum first
+        std::reverse(quorum_array.begin(), quorum_array.end());
         page_context.emplace(quorum_type.second + "_quorum_array_size", quorum_array.size());
     }
     return page_context;
 }
 
 std::string render_single_quorum_html(service_nodes::quorum_type qtype, uint64_t height) {
-    auto page_context = get_quorum_state_context(height, height, 1, qtype);
+    auto page_context = get_quorum_state_context(height, height, 1, std::numeric_limits<size_t>::max(), qtype);
 
     if (qtype == service_nodes::quorum_type::checkpointing)
 
@@ -887,17 +900,7 @@ render_quorum_states_html(bool add_header_and_footer)
     bool on_homepage             = !add_header_and_footer;
     size_t num_quorums_to_render = on_homepage ? no_quorum_entries_on_frontpage : 30;
 
-    // NOTE: If we're on the homepage, only display the latest height being
-    // voted for. This is not the latest height of the blockchain due to the
-    // reorg safety buffer.
     uint64_t block_height = core_storage->get_current_blockchain_height() - 1;
-    if (on_homepage)
-    {
-      if (block_height >= service_nodes::REORG_SAFETY_BUFFER_BLOCKS_POST_HF12)
-        block_height -= service_nodes::REORG_SAFETY_BUFFER_BLOCKS_POST_HF12;
-      else
-        block_height = 0;
-    }
     uint64_t start_height = block_height <= num_quorums_to_render ? 0 : block_height - num_quorums_to_render - 1;
     // +3 because we need to get a checkpoint quorum which is only every 4 blocks; when we overreach
     // we just cut off at the intended number when building the array below.

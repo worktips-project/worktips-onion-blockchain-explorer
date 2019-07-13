@@ -23,6 +23,11 @@
               <td>{{expiration_date}} ({{expiration_time_relative}})</td>
           </tr>
           {{/quorum_validators}}
+          {{#quorum_validators_more}}
+          <tr>
+              <td class="sn-more" colspan="3"><a href="/obligations_quorum/{{quorum_height}}">+ {{quorum_validators_more}} more ↪</a></td>
+          </tr>
+          {{/quorum_validators_more}}
 
           <tr>
               <th colspan="3" class="subheader">Nodes to test ({{quorum_workers_size}}):</th>
@@ -35,6 +40,11 @@
               <td>{{expiration_date}} ({{expiration_time_relative}})</td>
           </tr>
           {{/quorum_workers}}
+          {{#quorum_workers_more}}
+          <tr>
+              <td class="sn-more" colspan="3"><a href="/obligations_quorum/{{quorum_height}}">+ {{quorum_workers_more}} more ↪</a></td>
+          </tr>
+          {{/quorum_workers_more}}
       </table>
 </div> <!-- Wrapper -->
 {{/obligations_quorum_array}}
@@ -43,7 +53,10 @@
 {{#checkpointing_quorum_array}}
 
 <div class="Wrapper">
-  <h2 style="margin-bottom: 0px">Checkpoint quorum for height {{quorum_height}}</h2>
+    <h2 style="margin-bottom: 0px">
+        Checkpoint quorum for height {{quorum_height}}
+        {{#quorum_block_height}} (determined by block <a href="/block/{{quorum_block_height}}">{{quorum_block_height}}</a>){{/quorum_block_height}}
+    </h2>
 
       <div class="TitleDivider"></div>
 
@@ -61,6 +74,12 @@
               <td>{{expiration_date}} ({{expiration_time_relative}})</td>
           </tr>
           {{/quorum_workers}}
+
+          {{#quorum_workers_more}}
+          <tr>
+              <td class="sn-more" colspan="3"><a href="/obligations_quorum/{{quorum_height}}">+ {{quorum_workers_more}} more ↪</a></td>
+          </tr>
+          {{/quorum_workers_more}}
       </table>
 </div> <!-- Wrapper -->
 {{/checkpointing_quorum_array}}
