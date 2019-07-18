@@ -241,3 +241,9 @@ td span.checkpoint-not-signed { color: #c50022; }
 .omg {
     font-weight: bold;
 }
+
+.pending-mempool-stakes .tx {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
