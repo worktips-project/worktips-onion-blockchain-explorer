@@ -785,7 +785,7 @@ std::string make_service_node_expiry_time_str(COMMAND_RPC_GET_SERVICE_NODES::res
   return result;
 }
 
-mstch::array gather_sn_data(const std::vector<crypto::public_key> &nodes, const sn_entry_map &sn_map, const size_t sn_display_limit)
+mstch::array gather_sn_data(const std::vector<std::string> &nodes, const sn_entry_map &sn_map, const size_t sn_display_limit)
 {
     mstch::array data;
     data.reserve(nodes.size());
@@ -793,8 +793,7 @@ mstch::array gather_sn_data(const std::vector<crypto::public_key> &nodes, const 
 
     const size_t max = std::min(sn_display_limit, nodes.size());
     for (size_t i = 0; i < max; i++) {
-        const auto &pub_key = nodes[i];
-        const std::string pk_str = pod_to_hex(pub_key);
+        const auto &pk_str = nodes[i];
         mstch::map array_entry{{"public_key", pk_str}, {"quorum_index", std::to_string(i)}};
 
         auto it = sn_map.find(pk_str);
@@ -929,8 +928,8 @@ render_checkpoints_html(bool add_header_and_footer)
     checkpoints.reserve(response.checkpoints.size());
     for (const auto &cp : response.checkpoints) {
         mstch::map checkpoint;
-        checkpoint.emplace("checkpoint_type", checkpoint_t::type_to_string(cp.type));
-        checkpoint.emplace("checkpoint_block_hash", epee::string_tools::pod_to_hex(cp.block_hash));
+        checkpoint.emplace("checkpoint_type", cp.type);
+        checkpoint.emplace("checkpoint_block_hash", cp.block_hash);
         checkpoint.emplace("checkpoint_height", cp.height);
         checkpoint.emplace("checkpoint_quorum", cp.height - service_nodes::REORG_SAFETY_BUFFER_BLOCKS_POST_HF12);
         mstch::array signatures;
@@ -942,7 +941,7 @@ render_checkpoints_html(bool add_header_and_footer)
         for (const auto &s : cp.signatures) {
             mstch::map sig_info;
             sig_info.emplace("checkpoint_signer_voter_index", s.voter_index);
-            sig_info.emplace("checkpoint_signature", epee::string_tools::pod_to_hex(s.signature));
+            sig_info.emplace("checkpoint_signature", s.signature);
             signatures.push_back(std::move(sig_info));
             boost::get<mstch::map>(voter_signed[s.voter_index]).emplace("voter_signed", true);
         }
@@ -6791,10 +6790,8 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
                     if (response.status == "OK" && !response.quorums.empty()) {
                         auto &quorum = response.quorums[0].quorum;
                         if (state_change.service_node_index < quorum.workers.size())
-                            context["state_change_service_node_pubkey"] = pod_to_hex(quorum.workers[state_change.service_node_index]);
-                        quorum_nodes.reserve(quorum.validators.size());
-                        for (auto &v : quorum.validators)
-                            quorum_nodes.push_back(pod_to_hex(v));
+                            context["state_change_service_node_pubkey"] = quorum.workers[state_change.service_node_index];
+                        quorum_nodes = std::move(quorum.validators);
                         context["state_change_have_pubkey_info"] = true;
                     }
                 }
