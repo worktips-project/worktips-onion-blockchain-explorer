@@ -1791,8 +1791,33 @@ show_service_node(const std::string &service_node_pubkey)
       return std::string("Can't get service node pubkey or couldn't find as registered service node: " + service_node_pubkey);
     }
 
+    auto &sn = response.service_node_states[0];
     mstch::map page_context{};
-    set_service_node_fields(page_context, response.service_node_states[0]);
+    set_service_node_fields(page_context, sn);
+
+    if (!sn.funded) {
+        mstch::array pending_stakes;
+        // Check the mempool for pending contributions
+        for (const auto &mempool_tx : MempoolStatus::get_mempool_txs()) {
+            cryptonote::account_public_address contributor;
+            if (get_service_node_contributor_from_tx_extra(mempool_tx.tx.extra, contributor)) {
+                auto sn_key = extract_sn_pubkey(mempool_tx.tx.extra);
+                if (sn_key != service_node_pubkey)
+                    continue;
+                mstch::map contrib;
+                contrib["txid"] = pod_to_hex(mempool_tx.tx_hash);
+			    contrib["address"] = get_account_address_as_str(nettype, false /*is_subaddress*/, contributor);
+                uint64_t amount = get_amount_from_stake(mempool_tx.tx, contributor);
+                contrib["amount"] = amount > 0 ? lokeg::lok_amount_to_str(amount, "{:0.9f}", true) : "<decode error>";
+                pending_stakes.push_back(std::move(contrib));
+            }
+        }
+
+        if (!pending_stakes.empty()) {
+            page_context["pending_stakes_size"] = pending_stakes.size();
+            page_context["pending_stakes"] = std::move(pending_stakes);
+        }
+    }
 
     add_css_style(page_context);
     return mstch::render(template_file["service_node_detail"], page_context);
@@ -6654,6 +6679,40 @@ std::string extract_sn_pubkey(const std::vector<uint8_t> &tx_extra)
     }
 }
 
+inline uint64_t get_amount_from_stake(const cryptonote::transaction &tx, const cryptonote::account_public_address &contributor) {
+    uint64_t amount = 0;
+    crypto::secret_key tx_key;
+    crypto::key_derivation derivation;
+    if (cryptonote::get_tx_secret_key_from_tx_extra(tx.extra, tx_key) &&
+            generate_key_derivation(contributor.m_view_public_key, tx_key, derivation) &&
+            !tx.vout.empty() && tx.vout.back().target.type() == typeid(cryptonote::txout_to_key)) {
+        hw::device &hwdev = hw::get_device("default");
+        // The rules are a bit more complex to do this perfectly, and change depending on
+        // the fork version, but just assuming the stake is in the last tx will work (unless
+        // someone is building non-standard stake transactions manually).
+        size_t tx_offset = tx.vout.size() - 1;
+        rct::key mask;
+        crypto::secret_key scalar1;
+        hwdev.derivation_to_scalar(derivation, tx_offset, scalar1);
+        try {
+            switch (tx.rct_signatures.type) {
+                case rct::RCTTypeSimple:
+                case rct::RCTTypeBulletproof:
+                case rct::RCTTypeBulletproof2:
+                    amount = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), tx_offset, mask, hwdev);
+                    break;
+                case rct::RCTTypeFull:
+                    amount = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), tx_offset, mask, hwdev);
+                    break;
+                default:
+                    break;
+            }
+        }
+        catch (const std::exception &e) { /* ignore */ }
+    }
+    return amount;
+}
+
 mstch::map
 construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
 {
@@ -6867,36 +6926,7 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
 			context["contribution_service_node_pubkey"] = extract_sn_pubkey(tx.extra);
 			context["contribution_address"]             = get_account_address_as_str(nettype, false /*is_subaddress*/, contributor);
 
-            crypto::secret_key tx_key;
-            crypto::key_derivation derivation;
-            uint64_t amount = 0;
-            if (cryptonote::get_tx_secret_key_from_tx_extra(tx.extra, tx_key) &&
-                    generate_key_derivation(contributor.m_view_public_key, tx_key, derivation) &&
-                    !tx.vout.empty() && tx.vout.back().target.type() == typeid(cryptonote::txout_to_key)) {
-                hw::device &hwdev = hw::get_device("default");
-                // The rules are a bit more complex to do this perfectly, and change depending on
-                // the fork version, but just assuming the stake is in the last tx will work (unless
-                // someone is building non-standard stake transactions manually).
-                size_t tx_offset = tx.vout.size() - 1;
-                rct::key mask;
-                crypto::secret_key scalar1;
-                hwdev.derivation_to_scalar(derivation, tx_offset, scalar1);
-                try {
-                    switch (tx.rct_signatures.type) {
-                        case rct::RCTTypeSimple:
-                        case rct::RCTTypeBulletproof:
-                        case rct::RCTTypeBulletproof2:
-                            amount = rct::decodeRctSimple(tx.rct_signatures, rct::sk2rct(scalar1), tx_offset, mask, hwdev);
-                            break;
-                        case rct::RCTTypeFull:
-                            amount = rct::decodeRct(tx.rct_signatures, rct::sk2rct(scalar1), tx_offset, mask, hwdev);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                catch (const std::exception &e) { /* ignore */ }
-            }
+            uint64_t amount = get_amount_from_stake(tx, contributor);
             context["contribution_amount"] = amount > 0 ? lokeg::lok_amount_to_str(amount, "{:0.9f}", true) : "<decode error>";
         }
     }
