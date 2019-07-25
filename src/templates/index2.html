@@ -54,6 +54,8 @@
         </p>
     {{/network_info}}
 
+    <p>TX Types Legend: Recommission: &#x1F44D; | Decommission: &#x1F44E; | Deregister: &#x1F6AB; | IP Change Penalty: &#x1F4CB; | Stake Unlock: &#x1F513;</p>
+
     {{#emission}}
         <p style="margin-top: 2px">
             Circulating Supply: {{circulating_supply}}
@@ -84,6 +86,7 @@
                 <td>Height</td>
                 <td>Age {{age_format}}<!--(Δm)--></td>
                 <td>Size [kB]<!--(Δm)--></td>
+                <td>Type</td>
                 <td>Transaction Hash</td>
                 <td>Fee</td>
                 <td>Outputs</td>
@@ -95,6 +98,7 @@
                 <td><a href="/block/{{height}}">{{height}}</a></td>
                 <td>{{age}}<!--{{time_delta}}--></td>
                 <td>{{blk_size}}</td>
+                <td class="TXType">{{tx_type}}</td>
                 <td><a href="/tx/{{hash}}">{{hash}}</a></td>
                 <td>{{tx_fee_short}}</td>
                 <td>{{sum_outputs_short}}</td>

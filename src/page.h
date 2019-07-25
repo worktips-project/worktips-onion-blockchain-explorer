@@ -964,6 +964,27 @@ render_checkpoints_html(bool add_header_and_footer)
     return mstch::render(template_file["checkpoints_full"], page_context);
 }
 
+static std::string tx_type_to_emoji(cryptonote::transaction const &tx, uint8_t hf_version)
+{
+  std::string result;
+  if (tx.type == cryptonote::txtype::state_change)
+  {
+    tx_extra_service_node_state_change state_change;
+    if (get_service_node_state_change_from_tx_extra(tx.extra, state_change, hf_version))
+    {
+      if (state_change.state == service_nodes::new_state::deregister) result = "\xF0\x9F\x9A\xAB"; // no entry
+      if (state_change.state == service_nodes::new_state::decommission) result = "\xF0\x9F\x91\x8E"; // thumbs down
+      if (state_change.state == service_nodes::new_state::recommission) result = "\xF0\x9F\x91\x8D"; // thumbs up
+      if (state_change.state == service_nodes::new_state::ip_change_penalty) result = "\xF0\x9F\x93\x8B"; // clipboard
+    }
+  }
+  else if (tx.type == cryptonote::txtype::key_image_unlock)
+  {
+    result = "\xF0\x9F\x94\x93"; // open lock
+  }
+
+  return result;
+}
 
 /**
  * @brief show recent transactions and mempool
@@ -1229,9 +1250,7 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
             for(auto it = blk_txs.begin(); it != blk_txs.end(); ++it)
             {
                 const cryptonote::transaction& tx = *it;
-
                 const tx_details& txd = get_tx_details(tx, false, i, height);
-
                 mstch::map txd_map = txd.get_mstch_map();
 
                 //add age to the txd mstch map
@@ -1241,6 +1260,7 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
                 txd_map.insert({"is_ringct" , tx.version >= cryptonote::txversion::v2_ringct});
                 txd_map.insert({"rct_type"  , tx.rct_signatures.type});
                 txd_map.insert({"blk_size"  , blk_size_str});
+                txd_map.insert({"tx_type"   , tx_type_to_emoji(tx, blk.major_version)});
 
 
                 // do not show block info for other than first tx in a block
@@ -1490,6 +1510,7 @@ mempool(bool add_header_and_footer = false, uint64_t no_of_mempool_tx = 25)
                 {"timestamp_no"    , mempool_tx.receive_time},
                 {"timestamp"       , mempool_tx.timestamp_str},
                 {"age"             , age_str},
+                {"tx_type"         , tx_type_to_emoji(mempool_tx.tx, MempoolStatus::current_network_info.load().current_hf_version)},
                 {"hash"            , pod_to_hex(mempool_tx.tx_hash)},
                 {"fee"             , mempool_tx.fee_str},
                 {"payed_for_kB"    , mempool_tx.payed_for_kB_str},
@@ -6807,6 +6828,8 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
                                                with_ring_signatures)},
             {"tx_json"               , tx_json},
             {"is_ringct"             , tx.version >= cryptonote::txversion::v2_ringct},
+            {"tx_type"               , string(cryptonote::transaction::type_to_string(tx.type))},
+            {"tx_type_emoji"         , tx_type_to_emoji(tx, blk.major_version)},
             {"rct_type"              , tx.rct_signatures.type},
             {"has_error"             , false},
             {"error_msg"             , string("")},
@@ -6828,10 +6851,9 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             // deregistration transparently).
             tx_extra_service_node_state_change state_change;
             context["is_state_change"] = true;
-            bool new_style = get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_12_checkpointing);
-            if (new_style || get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_11_infinite_staking)) {
-                if (new_style)
-                    context["state_change_new_style"] = true;
+
+            if (get_service_node_state_change_from_tx_extra(tx.extra, state_change, blk.major_version)) {
+                context["state_change_new_style"] = blk.major_version >= cryptonote::network_version_12_checkpointing;
                 context["state_change_service_node_index"] = state_change.service_node_index;
                 context["state_change_block_height"] = state_change.block_height;
                 context[

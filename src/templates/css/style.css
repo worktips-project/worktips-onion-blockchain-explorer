@@ -247,3 +247,7 @@ td span.checkpoint-not-signed { color: #c50022; }
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.TXType {
+  font-family: initial;
+}
