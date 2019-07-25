@@ -6851,9 +6851,15 @@ construct_tx_context(transaction tx, uint16_t with_ring_signatures = 0)
             // deregistration transparently).
             tx_extra_service_node_state_change state_change;
             context["is_state_change"] = true;
-
+#if 1
+            bool new_style = get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_12_checkpointing);
+            if (new_style || get_service_node_state_change_from_tx_extra(tx.extra, state_change, cryptonote::network_version_11_infinite_staking)) {
+               if (new_style)
+                    context["state_change_new_style"] = true;
+#else
             if (get_service_node_state_change_from_tx_extra(tx.extra, state_change, blk.major_version)) {
                 context["state_change_new_style"] = blk.major_version >= cryptonote::network_version_12_checkpointing;
+#endif
                 context["state_change_service_node_index"] = state_change.service_node_index;
                 context["state_change_block_height"] = state_change.block_height;
                 context[
