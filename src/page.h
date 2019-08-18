@@ -1658,7 +1658,7 @@ mempool(bool add_header_and_footer = false, uint64_t no_of_mempool_tx = 25)
     context["partial_mempool_shown"] = true;
 
     // render the page
-    return mstch::render(template_file["mempool"], context);
+    return mstch::render(template_file["mempool"], context, partials);
 }
 
 
