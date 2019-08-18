@@ -976,6 +976,7 @@ void add_tx_service_node_metadata(mstch::map &context, const cryptonote::transac
     if (tx.version >= cryptonote::txversion::v3_per_output_unlock_times)
     {
         tx_extra_service_node_register     register_;
+        tx_extra_tx_key_image_unlock       unlock_;
         cryptonote::account_public_address contributor;
         if (tx.type == cryptonote::txtype::state_change)
         {
@@ -1037,6 +1038,15 @@ void add_tx_service_node_metadata(mstch::map &context, const cryptonote::transac
             }
             else {
                 context["state_change_unknown"] = std::string{"unknown"};
+            }
+        }
+        else if (tx.type == cryptonote::txtype::key_image_unlock && get_tx_key_image_unlock_from_tx_extra(tx.extra, unlock_))
+        {
+            context["have_unlock_info"] = true;
+            context["unlock_service_node_pubkey"] = extract_sn_pubkey(tx.extra);
+            if (detailed) {
+                context["unlock_key_image"] = pod_to_hex(unlock_.key_image);
+                context["unlock_signature"] = pod_to_hex(unlock_.signature);
             }
         }
         else if (get_service_node_register_from_tx_extra(tx.extra, register_))

@@ -130,6 +130,13 @@
         <p>Contribution Amount: {{contribution_amount}} LOKI</p>
     {{/have_contribution_info}}
 
+    {{#have_unlock_info}}
+        <h2>Service Node Unlock</h2>
+        <p class="unlock-pubkey">Service Node Public Key: <a href="/service_node/{{unlock_service_node_pubkey}}">{{unlock_service_node_pubkey}}</a></p>
+        <p>Unlock key image: {{unlock_key_image}}</p>
+        <p>Unlock signature: {{unlock_signature}}</p>
+    {{/have_unlock_info}}
+
 
   <h2>Outputs</h2>
   <h4 class="Subtitle">{{outputs_no}} output(s) for total of {{outputs_lok_sum}} lok</h4>
