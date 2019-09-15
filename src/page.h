@@ -1657,7 +1657,7 @@ mempool(bool add_header_and_footer = false, uint64_t no_of_mempool_tx = 25)
         context["partial_mempool_shown"] = false;
 
         // render the page
-        return mstch::render(template_file["mempool_full"], context);
+        return mstch::render(template_file["mempool_full"], context, partials);
     }
 
     // this is for partial disply on front page.
