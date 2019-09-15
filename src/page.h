@@ -1464,7 +1464,8 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
     context["network_info"] = mstch::map {
             {"difficulty"         , lokeg::make_comma_sep_number(current_network_info.difficulty)},
             {"hash_rate"          , hash_rate},
-            {"fee_per_kb"         , print_money(current_network_info.fee_per_kb)},
+            {"fee_per_byte"       , print_money(current_network_info.fee_per_byte)},
+            {"fee_per_output"     , print_money(current_network_info.fee_per_out)},
             {"alt_blocks_no"      , current_network_info.alt_blocks_count},
             {"have_alt_block"     , (current_network_info.alt_blocks_count > 0)},
             {"tx_pool_size"       , current_network_info.tx_pool_size},
@@ -6434,17 +6435,18 @@ json_networkinfo()
         return j_response;
     }
 
-    uint64_t fee_estimated {0};
+    uint64_t fee_estimated_per_byte{0}, fee_estimated_per_out{0};
 
     // get dynamic fee estimate from last 10 blocks
-    if (!get_dynamic_per_kb_fee_estimate(fee_estimated))
+    if (!get_fee_estimate(fee_estimated_per_byte, fee_estimated_per_out))
     {
         j_response["status"]  = "error";
         j_response["message"] = "Cant get dynamic fee esimate";
         return j_response;
     }
 
-    j_info["fee_per_kb"] = fee_estimated;
+    j_info["fee_per_byte"] = fee_estimated_per_byte;
+    j_info["fee_per_output"] = fee_estimated_per_out;
 
     j_info["tx_pool_size"]        = MempoolStatus::mempool_no.load();
     j_info["tx_pool_size_kbytes"] = MempoolStatus::mempool_size.load();
@@ -7595,7 +7597,8 @@ get_loki_network_info(json& j_info)
        {"block_size_limit"          , local_copy_network_info.block_size_limit},
        {"block_size_median"         , local_copy_network_info.block_size_median},
        {"start_time"                , local_copy_network_info.start_time},
-       {"fee_per_kb"                , local_copy_network_info.fee_per_kb},
+       {"fee_per_byte"              , local_copy_network_info.fee_per_byte},
+       {"fee_per_output"            , local_copy_network_info.fee_per_out},
        {"current_hf_version"        , local_copy_network_info.current_hf_version},
        {"total_blockchain_size"     , local_copy_network_info.total_blockchain_size}
     };
@@ -7604,16 +7607,16 @@ get_loki_network_info(json& j_info)
 }
 
 bool
-get_dynamic_per_kb_fee_estimate(uint64_t& fee_estimated)
+get_fee_estimate(uint64_t &fee_estimated_per_byte, uint64_t &fee_estimated_per_out)
 {
 
     string error_msg;
 
-    if (!rpc.get_dynamic_per_kb_fee_estimate(
+    if (!rpc.get_fee_estimate(
             FEE_ESTIMATE_GRACE_BLOCKS,
-            fee_estimated, error_msg))
+            fee_estimated_per_byte, fee_estimated_per_out, error_msg))
     {
-        cerr << "rpc.get_dynamic_per_kb_fee_estimate failed" << endl;
+        cerr << "rpc.get_fee_estimate failed" << endl;
         return false;
     }
 
