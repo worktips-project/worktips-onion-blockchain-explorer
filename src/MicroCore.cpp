@@ -52,7 +52,7 @@ MicroCore::init(const string& _blockchain_path, network_type nt)
     try
     {
         // try opening lmdb database files
-        db->open(blockchain_path, db_flags);
+        db->open(blockchain_path, nettype,  db_flags);
     }
     catch (const std::exception& e)
     {
