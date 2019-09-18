@@ -24,8 +24,10 @@
               <td>{{staking_requirement}}</td>
               <td>{{last_reward_at_block}}</td>
               <td>{{last_uptime_proof}}</td>
-              <td>
-                  {{#expiration_date}}{{expiration_date}} ({{expiration_time_relative}}){{/expiration_date}}
+              <td>{{#expiration_date}}
+                    <span title="Service Node unlock in progress">🔓</span>
+                    {{expiration_date}} ({{expiration_time_relative}})
+                  {{/expiration_date}}
                   {{^expiration_date}}Staking Infinitely{{/expiration_date}}
               </td>
           </tr>
@@ -94,7 +96,13 @@
               <td>{{total_contributed}}</td>
               <td>{{total_reserved}}</td>
               <td>{{staking_requirement}}</td>
-              <td>{{expiration_date}} ({{expiration_time_relative}})</td>
+              <td>{{#expiration_date}}
+                    <span title="Service Node unlock in progress">🔓</span>
+                    {{expiration_date}} ({{expiration_time_relative}})
+                  {{/expiration_date}}
+                  {{^expiration_date}}Staking Infinitely{{/expiration_date}}
+              </td>
+
           </tr>
           {{/service_nodes_awaiting}}
           {{#service_nodes_awaiting_more}}
