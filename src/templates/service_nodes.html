@@ -94,7 +94,14 @@
               <td><a href="/service_node/{{public_key}}">{{public_key}}</a></td>
               <td>{{num_contributors}}</td>
               <td>{{^solo_node}}{{operator_cut}}{{/solo_node}}</td>
+              {{#only_reserved_spots}}
+              <td title="All remaining contribution room is reserved for specific contributors">
+                  ⛔ {{open_for_contribution}}
+              </td>
+              {{/only_reserved_spots}}
+              {{^only_reserved_spots}}
               <td>{{open_for_contribution}}</td>
+              {{/only_reserved_spots}}
               <td>{{total_contributed}}</td>
               <td>{{total_reserved}}</td>
               <td>{{staking_requirement}}</td>
