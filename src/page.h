@@ -1838,6 +1838,7 @@ show_block(uint64_t _blk_height)
 
     string blk_pow_hash_str = pod_to_hex(get_block_longhash(core_storage, blk, _blk_height, 0));
     uint64_t blk_difficulty = core_storage->get_db().get_block_difficulty(_blk_height);
+    uint64_t blk_cumulative_difficulty = core_storage->get_db().get_block_cumulative_difficulty(_blk_height);
 
     mstch::map context {
             {"testnet"              , testnet},
@@ -1858,12 +1859,12 @@ show_block(uint64_t _blk_height)
             {"delta_time"           , delta_time},
             {"blk_nonce"            , blk.nonce},
             {"blk_pow_hash"         , blk_pow_hash_str},
-            {"blk_difficulty"       , blk_difficulty},
+            {"blk_difficulty"       , lokeg::make_comma_sep_number(blk_difficulty)},
             {"age_format"           , age.second},
             {"major_ver"            , std::to_string(blk.major_version)},
             {"minor_ver"            , std::to_string(blk.minor_version)},
-            {"blk_size"             , fmt::format("{:0.4f}",
-                                                  static_cast<double>(blk_size) / 1024.0)},
+            {"blk_size"             , fmt::format("{:0.4f}", static_cast<double>(blk_size) / 1024.0)},
+            {"blk_cumulative_difficulty" , lokeg::make_comma_sep_number(blk_cumulative_difficulty)},
     };
 
     add_tx_service_node_metadata(context, blk.miner_tx, true /*detailed*/);
