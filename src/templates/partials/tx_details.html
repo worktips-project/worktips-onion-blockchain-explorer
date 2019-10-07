@@ -41,15 +41,21 @@
             <td>Fee (Per kB): {{tx_fee}} ({{payed_for_kB}})</td>
             <td>TX Size: {{tx_size}} kB</td>
         </tr>
+
         <tr>
-            <td>TX Version: {{tx_version}}</td>
+            <td>TX Version/Type: {{tx_version}}/{{tx_type_emoji}} {{tx_type}}</td>
             <td>No Of Confirmations: {{confirmations}}</td>
             <td>RingCT/RingCT Type:  {{#is_ringct}}Yes/{{rct_type}}{{/is_ringct}}{{^is_ringct}}No{{/is_ringct}}</td>
         </tr>
 
+        {{#is_miner_tx}}
         <tr>
-          <td>TX Type: {{tx_type_emoji}} {{tx_type}}</td>
+            <td>Service Node Winner:</td><td><a href="/service_node/{{service_node_winner}}">{{service_node_winner}}</a></td>
         </tr>
+
+        <tr>
+        </tr>
+        {{/is_miner_tx}}
 
         <tr>
             <td colspan="3" style="max-width:700px;word-wrap:break-word;">Extra: {{extra}}</td>
