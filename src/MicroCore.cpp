@@ -35,20 +35,12 @@ MicroCore::MicroCore():
  * Initialize m_blockchain_storage with the BlockchainLMDB object.
  */
 bool
-MicroCore::init(const string& _blockchain_path, network_type nt)
+MicroCore::init(const string& blockchain_path_, network_type nt)
 {
-    int db_flags = 0;
-
-    blockchain_path = _blockchain_path;
-
-    nettype = nt;
-
-    db_flags |= MDB_RDONLY;
-    db_flags |= MDB_NOLOCK;
-
-    BlockchainDB* db = nullptr;
-    db = new BlockchainLMDB();
-
+    blockchain_path = blockchain_path_;
+    nettype         = nt;
+    int db_flags    = DBF_RDONLY;
+    BlockchainDB* db = new BlockchainLMDB();
     try
     {
         // try opening lmdb database files
