@@ -584,10 +584,11 @@ page(MicroCore* _mcore,
 
 }
 
-int portions_to_percent(uint64_t portions)
+std::string portions_to_percent(uint64_t portions)
 {
-    int result = (int)(((portions / (double)STAKING_PORTIONS) * 100.0) + 0.5);
-    return result;
+    std::ostringstream os;
+    os << portions / (double)STAKING_PORTIONS * 100.;
+    return os.str();
 }
 
 time_t calculate_service_node_expiry_timestamp(uint64_t expiry_height)
