@@ -824,10 +824,11 @@ mstch::array gather_sn_data(const std::vector<std::string> &nodes, const sn_entr
     return data;
 }
 
-mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, size_t num_quorums, size_t sn_display_limit = 20, service_nodes::quorum_type type = service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value) {
+mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, size_t num_quorums, size_t sn_display_limit = 20, const service_nodes::quorum_type *type = nullptr) {
 
+    uint8_t q_type = type ? static_cast<uint8_t>(*type) : COMMAND_RPC_GET_QUORUM_STATE::ALL_QUORUMS_SENTINEL_VALUE;
     COMMAND_RPC_GET_QUORUM_STATE::response response = {};
-    rpc.get_quorum_state(response, start_height, end_height, static_cast<uint8_t>(type));
+    rpc.get_quorum_state(response, start_height, end_height, q_type);
 
     sn_entry_map pk2sninfo;
     {
@@ -839,10 +840,12 @@ mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, 
     }
 
     std::vector<std::pair<service_nodes::quorum_type, std::string>> quorum_types;
-    if (type == service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value || type == service_nodes::quorum_type::obligations)
+    if (!type || *type == service_nodes::quorum_type::obligations)
         quorum_types.emplace_back(service_nodes::quorum_type::obligations, "obligations");
-    if (type == service_nodes::quorum_type::rpc_request_all_quorums_sentinel_value || type == service_nodes::quorum_type::checkpointing)
+    if (!type || *type == service_nodes::quorum_type::checkpointing)
         quorum_types.emplace_back(service_nodes::quorum_type::checkpointing, "checkpointing");
+    if (!type || *type == service_nodes::quorum_type::blink)
+        quorum_types.emplace_back(service_nodes::quorum_type::blink, "blink");
 
     mstch::map page_context {};
 
@@ -891,10 +894,7 @@ mstch::map get_quorum_state_context(uint64_t start_height, uint64_t end_height, 
 }
 
 std::string render_single_quorum_html(service_nodes::quorum_type qtype, uint64_t height) {
-    auto page_context = get_quorum_state_context(height, height, 1, std::numeric_limits<size_t>::max(), qtype);
-
-    if (qtype == service_nodes::quorum_type::checkpointing)
-
+    auto page_context = get_quorum_state_context(height, height, 1, std::numeric_limits<size_t>::max(), &qtype);
     add_css_style(page_context);
     return mstch::render(template_file["quorum_states_full"], page_context);
 }
@@ -6235,7 +6235,7 @@ json_outputs(string tx_hash_str,
     // check if submited data in the request
     // matches to what was used to produce response.
     j_data["tx_hash"]  = pod_to_hex(txd.hash);
-    j_data["address"]  = pod_to_hex(address_info.address);
+    j_data["address"]  = REMOVE_HASH_BRAKETS(lokeg::print_address(address_info, nettype));
     j_data["viewkey"]  = pod_to_hex(prv_view_key);
     j_data["tx_prove"] = tx_prove;
 
@@ -6417,7 +6417,7 @@ json_outputsblocks(string _limit,
     // return parsed values. can be use to double
     // check if submited data in the request
     // matches to what was used to produce response.
-    j_data["address"]  = pod_to_hex(address_info.address);
+    j_data["address"]  = REMOVE_HASH_BRAKETS(lokeg::print_address(address_info, nettype));
     j_data["viewkey"]  = pod_to_hex(prv_view_key);
     j_data["limit"]    = _limit;
     j_data["height"]   = height;
@@ -7395,7 +7395,7 @@ get_tx_details(const transaction& tx,
         if (tx.vin.at(0).type() != typeid(txin_gen))
         {
             // get tx fee
-            txd.fee = get_tx_fee(tx);
+            txd.fee = get_tx_miner_fee(tx, false /*don't subtract burned amounts*/);
         }
     }
 

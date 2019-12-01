@@ -537,8 +537,6 @@ bool rpccalls::get_checkpoints(COMMAND_RPC_GET_CHECKPOINTS::response &res, uint3
     if (!result)
         cerr << "Error connecting to Loki daemon at " << daemon_url << endl;
 
-    std::cerr << "wtf; result has " << res.checkpoints.size() << " checkpoints\n";
-
     res = std::move(response.result);
     return result;
 }
