@@ -3651,7 +3651,6 @@ show_checkrawtx(string raw_tx_data, string action)
 
                 mstch::map tx_cd_data {
                         {"no_of_sources"      , static_cast<uint64_t>(no_of_sources)},
-                        {"use_rct"            , tx_cd.v2_use_rct},
                         {"change_amount"      , lokeg::lok_amount_to_str(tx_change.amount)},
                         {"has_payment_id"     , (payment_id  != null_hash)},
                         {"has_payment_id8"    , (payment_id8 != null_hash8)},
