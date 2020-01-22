@@ -623,6 +623,10 @@ void set_service_node_fields(mstch::map &context, const cryptonote::COMMAND_RPC_
     context["total_reserved"] = print_money(entry.total_reserved);
     context["staking_requirement"] = print_money(entry.staking_requirement);
     context["stake_remaining"] = print_money(entry.funded ? 0 : entry.staking_requirement - entry.total_contributed);
+    context["stake_min_contribution"] = print_money(
+            !entry.funded && entry.contributors.size() < MAX_NUMBER_OF_CONTRIBUTORS
+            ? open_contribution_remaining / (MAX_NUMBER_OF_CONTRIBUTORS - entry.contributors.size())
+            : 0);
     if (entry.funded)
         context["is_fully_funded"] = true;
 
