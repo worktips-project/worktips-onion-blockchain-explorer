@@ -3645,8 +3645,8 @@ show_checkrawtx(string raw_tx_data, string action)
                 get_payment_id(tx_cd.extra, payment_id, payment_id8);
 
                 // payments id. both normal and encrypted (payment_id8)
-                string pid_str   = REMOVE_HASH_BRAKETS(fmt::format("{:s}", payment_id));
-                string pid8_str  = REMOVE_HASH_BRAKETS(fmt::format("{:s}", payment_id8));
+                string pid_str   = REMOVE_HASH_BRACKETS(fmt::format("{:s}", payment_id));
+                string pid8_str  = REMOVE_HASH_BRACKETS(fmt::format("{:s}", payment_id8));
 
 
                 mstch::map tx_cd_data {
@@ -4116,7 +4116,7 @@ show_checkrawtx(string raw_tx_data, string action)
                         = real_txd.output_pub_keys[tx_source.real_output_in_tx_index].first.key;
 
                 real_output_pub_keys.push_back(
-                        REMOVE_HASH_BRAKETS(fmt::format("{:s}",real_out_pub_key))
+                        REMOVE_HASH_BRACKETS(fmt::format("{:s}",real_out_pub_key))
                 );
 
                 real_output_indices.push_back(tx_source.real_output);
@@ -4310,7 +4310,7 @@ show_pushrawtx(string raw_tx_data, string action)
 
         tx_details txd = get_tx_details(ptx.tx);
 
-        string tx_hash_str  = REMOVE_HASH_BRAKETS(fmt::format("{:s}", txd.hash));
+        string tx_hash_str  = REMOVE_HASH_BRACKETS(fmt::format("{:s}", txd.hash));
 
         mstch::map tx_cd_data {
                 {"tx_hash"          , tx_hash_str}
@@ -4360,7 +4360,7 @@ show_pushrawtx(string raw_tx_data, string action)
 
             for (key_image& k_img: key_images_spent)
             {
-                error_msg += REMOVE_HASH_BRAKETS(fmt::format("{:s}", k_img));
+                error_msg += REMOVE_HASH_BRACKETS(fmt::format("{:s}", k_img));
                 error_msg += "</br>";
             }
 
@@ -4540,9 +4540,9 @@ show_checkrawkeyimgs(string raw_data, string viewkey_str)
     address_parse_info address_info {*lok_address, false};
 
 
-    context.insert({"address"        , REMOVE_HASH_BRAKETS(
+    context.insert({"address"        , REMOVE_HASH_BRACKETS(
             lokeg::print_address(address_info, nettype))});
-    context.insert({"viewkey"        , REMOVE_HASH_BRAKETS(
+    context.insert({"viewkey"        , REMOVE_HASH_BRACKETS(
             fmt::format("{:s}", prv_view_key))});
     context.insert({"has_total_lok"  , false});
     context.insert({"total_lok"      , string{}});
@@ -4674,7 +4674,7 @@ show_checkcheckrawoutput(string raw_data, string viewkey_str)
 
     address_parse_info address_info {*lok_address, false, false, crypto::null_hash8};
 
-    context.insert({"address"        , REMOVE_HASH_BRAKETS(
+    context.insert({"address"        , REMOVE_HASH_BRACKETS(
             lokeg::print_address(address_info, nettype))});
     context.insert({"viewkey"        , pod_to_hex(prv_view_key)});
     context.insert({"has_total_lok"  , false});
@@ -4797,9 +4797,9 @@ show_checkcheckrawoutput(string raw_data, string viewkey_str)
 
         mstch::map output_info {
                 {"output_no"           , fmt::format("{:03d}", output_no)},
-                {"output_pub_key"      , REMOVE_HASH_BRAKETS(fmt::format("{:s}", txout_key.key))},
+                {"output_pub_key"      , REMOVE_HASH_BRACKETS(fmt::format("{:s}", txout_key.key))},
                 {"amount"              , lokeg::lok_amount_to_str(lok_amount)},
-                {"tx_hash"             , REMOVE_HASH_BRAKETS(fmt::format("{:s}", td.m_txid))},
+                {"tx_hash"             , REMOVE_HASH_BRACKETS(fmt::format("{:s}", td.m_txid))},
                 {"timestamp"           , lokeg::timestamp_to_str_gm(blk_timestamp)},
                 {"is_spent"            , is_output_spent},
                 {"is_ringct"           , td.m_rct}
@@ -4949,9 +4949,9 @@ show_address_details(const address_parse_info& address_info, cryptonote::network
     string pub_spendkey_str = fmt::format("{:s}", address_info.address.m_spend_public_key);
 
     mstch::map context {
-            {"lok_address"        , REMOVE_HASH_BRAKETS(address_str)},
-            {"public_viewkey"     , REMOVE_HASH_BRAKETS(pub_viewkey_str)},
-            {"public_spendkey"    , REMOVE_HASH_BRAKETS(pub_spendkey_str)},
+            {"lok_address"        , REMOVE_HASH_BRACKETS(address_str)},
+            {"public_viewkey"     , REMOVE_HASH_BRACKETS(pub_viewkey_str)},
+            {"public_spendkey"    , REMOVE_HASH_BRACKETS(pub_spendkey_str)},
             {"is_integrated_addr" , false},
             {"testnet"            , testnet},
             {"stagenet"           , stagenet},
@@ -4976,10 +4976,10 @@ show_integrated_address_details(const address_parse_info& address_info,
     string enc_payment_id_str = fmt::format("{:s}", encrypted_payment_id);
 
     mstch::map context {
-            {"lok_address"          , REMOVE_HASH_BRAKETS(address_str)},
-            {"public_viewkey"       , REMOVE_HASH_BRAKETS(pub_viewkey_str)},
-            {"public_spendkey"      , REMOVE_HASH_BRAKETS(pub_spendkey_str)},
-            {"encrypted_payment_id" , REMOVE_HASH_BRAKETS(enc_payment_id_str)},
+            {"lok_address"          , REMOVE_HASH_BRACKETS(address_str)},
+            {"public_viewkey"       , REMOVE_HASH_BRACKETS(pub_viewkey_str)},
+            {"public_spendkey"      , REMOVE_HASH_BRACKETS(pub_spendkey_str)},
+            {"encrypted_payment_id" , REMOVE_HASH_BRACKETS(enc_payment_id_str)},
             {"is_integrated_addr"   , true},
             {"testnet"              , testnet},
             {"stagenet"             , stagenet},
@@ -6234,7 +6234,7 @@ json_outputs(string tx_hash_str,
     // check if submited data in the request
     // matches to what was used to produce response.
     j_data["tx_hash"]  = pod_to_hex(txd.hash);
-    j_data["address"]  = REMOVE_HASH_BRAKETS(lokeg::print_address(address_info, nettype));
+    j_data["address"]  = REMOVE_HASH_BRACKETS(lokeg::print_address(address_info, nettype));
     j_data["viewkey"]  = pod_to_hex(prv_view_key);
     j_data["tx_prove"] = tx_prove;
 
@@ -6416,7 +6416,7 @@ json_outputsblocks(string _limit,
     // return parsed values. can be use to double
     // check if submited data in the request
     // matches to what was used to produce response.
-    j_data["address"]  = REMOVE_HASH_BRAKETS(lokeg::print_address(address_info, nettype));
+    j_data["address"]  = REMOVE_HASH_BRACKETS(lokeg::print_address(address_info, nettype));
     j_data["viewkey"]  = pod_to_hex(prv_view_key);
     j_data["limit"]    = _limit;
     j_data["height"]   = height;

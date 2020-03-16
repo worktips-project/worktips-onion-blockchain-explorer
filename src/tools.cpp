@@ -120,7 +120,7 @@ inline bool
 is_separator(char c)
 {
     // default linux path separator
-    const char separator = PATH_SEPARARTOR;
+    const char separator = PATH_SEPARATOR;
 
     return c == separator;
 }
