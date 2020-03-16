@@ -31,8 +31,11 @@ LOK_AMOUNT(double value)
     return value / 1e9;
 }
 
-#define REMOVE_HASH_BRACKETS(a_hash) \
-    a_hash.substr(1, a_hash.size() - 2)
+inline std::string
+REMOVE_HASH_BRACKETS(const std::string & a_hash)
+{
+    return a_hash.substr(1, a_hash.size() - 2);
+}
 
 /**
  * Some helper functions used in the example.
