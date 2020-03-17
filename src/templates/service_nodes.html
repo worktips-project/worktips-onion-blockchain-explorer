@@ -14,9 +14,9 @@
               <td>Public Key</td>
               <td>Contributors</td>
               <td>Operator Fee (%)</td>
-              <td>Open For Contribution</td>
               <td>Contributed</td>
-              <td>Staking Requirement</td>
+              <td>Open For Contribution</td>
+              <td>Min. Contribution</td>
               <td>Expiry Date UTC (Estimated)</td>
           </tr>
 
@@ -25,6 +25,7 @@
               <td><a href="/service_node/{{public_key}}">{{public_key}}</a></td>
               <td>{{num_contributors}}</td>
               <td>{{^solo_node}}{{operator_cut}}{{/solo_node}}</td>
+              <td>{{total_contributed}}</td>
               {{#only_reserved_spots}}
               <td title="All remaining contribution room is reserved for specific contributors">
                   ⛔ {{open_for_contribution}}
@@ -33,8 +34,7 @@
               {{^only_reserved_spots}}
               <td>{{open_for_contribution}}</td>
               {{/only_reserved_spots}}
-              <td>{{total_contributed}}</td>
-              <td>{{staking_requirement}}</td>
+              <td>{{stake_min_contribution}}</td>
               <td>{{#expiration_date}}
                     <span title="Service Node unlock in progress">🔓</span>
                     {{expiration_date}} ({{expiration_time_relative}})
