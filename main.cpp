@@ -150,10 +150,9 @@ main(int ac, const char* av[])
     // get blockchain path
     path blockchain_path;
 
-    if (!lokeg::get_blockchain_path(bc_path_opt, blockchain_path, nettype))
-    {
-        cerr << "Error getting blockchain path." << endl;
-        return EXIT_FAILURE;
+    if (!lokeg::get_blockchain_path(bc_path_opt, blockchain_path, nettype)) {
+      cerr << "Error getting blockchain path." << endl;
+      return EXIT_FAILURE;
     }
 
     cout << blockchain_path << endl;
