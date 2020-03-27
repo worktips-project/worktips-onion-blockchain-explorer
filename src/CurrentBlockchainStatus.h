@@ -23,29 +23,30 @@ struct CurrentBlockchainStatus
 
     struct Emission
     {
+        uint64_t blk_no;
         uint64_t coinbase;
         uint64_t fee;
-        uint64_t blk_no;
+        uint64_t circulating_supply; // NOTE: Excludes any publicised locked tokens
+        uint64_t burn;
 
         inline uint64_t
         checksum() const
         {
-            return coinbase + fee + blk_no;
+            return blk_no + coinbase + fee + circulating_supply + burn;
         }
 
         operator
         std::string() const
         {
-            return to_string(blk_no) + ","
+            return
+                to_string(blk_no) + ","
                  + to_string(coinbase) + ","
                  + to_string(fee) + ","
+                 + to_string(circulating_supply) + ","
+                 + to_string(burn) + ","
                  + to_string(checksum());
         }
     };
-
-    static uint64_t circulating_supply;
-    static uint64_t circulating_supply_calc_from_height;
-    static bool     circulating_supply_is_accurate;
 
     static bf::path blockchain_path;
 
@@ -93,7 +94,7 @@ struct CurrentBlockchainStatus
     update_current_emission_amount();
 
     static Emission
-    calculate_emission_in_blocks(uint64_t start_blk, uint64_t end_blk);
+    calculate_emission_in_blocks(uint64_t start_blk, uint64_t end_blk, uint64_t &unlocked);
 
     static bool
     save_current_emission_amount();

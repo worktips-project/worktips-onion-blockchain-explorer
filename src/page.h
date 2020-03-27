@@ -1522,29 +1522,23 @@ index2(uint64_t page_no = 0, bool refresh_page = false)
         CurrentBlockchainStatus::Emission current_values
                 = CurrentBlockchainStatus::get_emission();
 
-        string emission_blk_no   = std::to_string(current_values.blk_no - 1);
-        string emission_coinbase = lok_amount_to_str(current_values.coinbase, "{:0.3f}");
-        string emission_fee      = lok_amount_to_str(current_values.fee, "{:0.3f}");
+        std::string emission_blk_no   = std::to_string(current_values.blk_no - 1);
+        std::string emission_supply   = lokeg::make_comma_sep_number(current_values.circulating_supply / COIN);
+        std::string emission_coinbase = lokeg::make_comma_sep_number(current_values.coinbase / COIN);
+        std::string emission_fee      = lokeg::make_comma_sep_number(current_values.fee / COIN);
+        std::string emission_burn     = current_values.burn ? lokeg::make_comma_sep_number(current_values.burn / COIN) : "0";
 
         context["emission"] = mstch::map {
-                {"blk_no"    , emission_blk_no},
-                {"amount"    , emission_coinbase},
-                {"fee_amount", emission_fee},
-                {"circulating_supply", lokeg::make_comma_sep_number(CurrentBlockchainStatus::circulating_supply)}
+                {"blk_no"    ,  emission_blk_no},
+                {"supply"    ,  emission_supply},
+                {"coinbase"  ,  emission_coinbase},
+                {"fee_amount",  emission_fee},
+                {"burn_amount", emission_burn},
         };
-
-        if (CurrentBlockchainStatus::circulating_supply_calc_from_height + 10 < core_storage->get_current_blockchain_height())
-        {
-          context.emplace("circulating_supply_is_up_to_date", false);
-        }
-        else
-        {
-          context.emplace("circulating_supply_is_up_to_date", true);
-        }
     }
     else
     {
-        cerr  << "emission thread not running, skipping." << endl;
+      cerr << "emission thread not running, skipping." << endl;
     }
 
     // Service nodes, quorums, checkpoint summaries:
@@ -6506,15 +6500,13 @@ json_emission()
         CurrentBlockchainStatus::Emission current_values
                 = CurrentBlockchainStatus::get_emission();
 
-        string emission_blk_no   = std::to_string(current_values.blk_no - 1);
-        string emission_coinbase = lok_amount_to_str(current_values.coinbase, "{:0.3f}");
-        string emission_fee      = lok_amount_to_str(current_values.fee, "{:0.4f}", false);
-
+        std::cout << current_values.circulating_supply << std::endl;
         j_data = json {
                 {"blk_no"  ,           current_values.blk_no - 1},
                 {"coinbase",           current_values.coinbase},
-                {"fee"     ,           current_values.fee},
-                {"circulating_supply", CurrentBlockchainStatus::circulating_supply},
+                {"circulating_supply", current_values.circulating_supply},
+                {"fee",                current_values.fee},
+                {"burn",               current_values.burn},
         };
     }
 
