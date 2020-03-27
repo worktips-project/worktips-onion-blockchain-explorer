@@ -13,9 +13,7 @@
 namespace lokeg
 {
 
-static const uint64_t DAY_0_CIRC_SUPPLY = 15606500;
 using namespace std;
-
 void
 CurrentBlockchainStatus::set_blockchain_variables(MicroCore* _mcore,
                                                   Blockchain* _core_storage)
@@ -24,158 +22,24 @@ CurrentBlockchainStatus::set_blockchain_variables(MicroCore* _mcore,
     core_storage =_core_storage;
 }
 
-struct LockedAmounts
+using BlockHeight = uint64_t;
+uint64_t const founders_locked_loki            = 1215000 * COIN;
+uint64_t const seed_locked_loki                = 581000 * COIN;
+uint64_t const half_seed_locked_loki           = seed_locked_loki * COIN / 2;
+static std::map<BlockHeight, uint64_t> time_locked_loki =
 {
-    uint64_t time;
-    uint64_t amount;
+    {0,      871500 * COIN},
+    {69456,  founders_locked_loki + seed_locked_loki},
+    {134079, founders_locked_loki + seed_locked_loki},
+    {198639, founders_locked_loki + seed_locked_loki},
+    {263423, founders_locked_loki + half_seed_locked_loki}
 };
-
-#define DAY_TO_S(time)    (HOUR_TO_S(time) * 24ULL)
-#define HOUR_TO_S(time)   (MINUTE_TO_S(time) * 60ULL)
-#define MINUTE_TO_S(time) ((time) * 60ULL)
-uint64_t const founders_locked_tokens            = 1215000;
-uint64_t const seed_locked_tokens                = 581000;
-uint64_t const half_seed_locked_tokens           = seed_locked_tokens * 0.5f;
-static int locked_tx_end_timestamps_index        = 0;
-static LockedAmounts const locked_tx_end_timestamps[] =
-{
-    {1525853753 + DAY_TO_S(90),  founders_locked_tokens + seed_locked_tokens},
-    {1525856674 + DAY_TO_S(180), founders_locked_tokens + seed_locked_tokens},
-    {1525859150 + DAY_TO_S(270), founders_locked_tokens + seed_locked_tokens},
-    {1525862680 + DAY_TO_S(360), founders_locked_tokens + half_seed_locked_tokens}
-};
-#undef DAY_TO_S
-#undef HOUR_TO_S
-#undef MINUTE_TO_S
-
-
-#define ARRAY_COUNT(array) (sizeof(array)/sizeof(array[0]))
-static void update_circulating_supply()
-{
-    uint64_t const curr_height = CurrentBlockchainStatus::core_storage->get_current_blockchain_height();
-    if (CurrentBlockchainStatus::circulating_supply_calc_from_height >= curr_height)
-    {
-        return;
-    }
-
-    uint64_t start_height = CurrentBlockchainStatus::circulating_supply_calc_from_height;
-    if (!CurrentBlockchainStatus::circulating_supply_is_accurate)
-    {
-        start_height = 1;
-        CurrentBlockchainStatus::circulating_supply = DAY_0_CIRC_SUPPLY;
-    }
-
-    CurrentBlockchainStatus::circulating_supply_is_accurate = true;
-    for (size_t height = start_height; height < curr_height; height++)
-    {
-        block blk;
-        if (!CurrentBlockchainStatus::mcore->get_block_by_height(height, blk))
-        {
-            CurrentBlockchainStatus::circulating_supply_is_accurate = false;
-            continue;
-        }
-
-        uint64_t fees = 0;
-        for (size_t i = 0; i < blk.tx_hashes.size(); i++)
-        {
-            const crypto::hash& tx_hash = blk.tx_hashes.at(i);
-
-            transaction tx;
-            if (!CurrentBlockchainStatus::mcore->get_tx(tx_hash, tx))
-            {
-                CurrentBlockchainStatus::circulating_supply_is_accurate = false;
-                continue;
-            }
-
-            if (tx.vin.size() > 0)
-            {
-                if (tx.vin.at(0).type() != typeid(txin_gen))
-                {
-                    fees += get_tx_miner_fee(tx, false /*don't subtract burned amount*/);
-
-                    // FIXME: calculate, store, and show burned amounts
-                }
-            }
-        }
-
-        uint64_t block_reward = (sum_money_in_outputs(blk.miner_tx) - fees) / 1000000000;
-        CurrentBlockchainStatus::circulating_supply += block_reward;
-
-    }
-
-    CurrentBlockchainStatus::circulating_supply_calc_from_height = curr_height;
-
-    block latest_block;
-    if (CurrentBlockchainStatus::mcore->get_block_by_height(curr_height - 1, latest_block))
-    {
-        for (; locked_tx_end_timestamps_index < ARRAY_COUNT(locked_tx_end_timestamps); locked_tx_end_timestamps_index++)
-        {
-            LockedAmounts const *locked_tx = locked_tx_end_timestamps + locked_tx_end_timestamps_index;
-            if (latest_block.timestamp < locked_tx->time)
-            {
-                break;
-            }
-
-            CurrentBlockchainStatus::circulating_supply += locked_tx->amount;
-        }
-    }
-
-    FILE *circulating_supply_file = fopen("circulating_supply_cache.txt", "w+");
-    if (circulating_supply_file)
-    {
-      fprintf(circulating_supply_file, "%zu %zu", CurrentBlockchainStatus::circulating_supply_calc_from_height, CurrentBlockchainStatus::circulating_supply);
-      fclose(circulating_supply_file);
-    }
-}
-
 
 void
 CurrentBlockchainStatus::start_monitor_blockchain_thread()
 {
     total_emission_atomic = Emission{};
     string emmision_saved_file = get_output_file_path().string();
-
-    FILE *circulating_supply_file = fopen("circulating_supply_cache.txt", "r");
-    if (circulating_supply_file)
-    {
-      char line[512];
-      line[0] = 0;
-
-      fgets(line, ARRAY_COUNT(line), circulating_supply_file);
-      CurrentBlockchainStatus::circulating_supply_calc_from_height = atoi(line);
-
-      char *line_ptr = line + 0;
-      while(line_ptr[0] && line_ptr[0] != ' ') line_ptr++;
-      line_ptr++;
-
-      CurrentBlockchainStatus::circulating_supply = atoi(line_ptr);
-      CurrentBlockchainStatus::circulating_supply_is_accurate = true;
-      fclose(circulating_supply_file);
-
-      block blk;
-      if (!CurrentBlockchainStatus::mcore->get_block_by_height(
-              CurrentBlockchainStatus::circulating_supply_calc_from_height - 1, blk))
-      {
-          CurrentBlockchainStatus::circulating_supply_is_accurate = false;
-          CurrentBlockchainStatus::circulating_supply_calc_from_height = 0;
-      }
-      else
-      {
-          for (;locked_tx_end_timestamps_index < ARRAY_COUNT(locked_tx_end_timestamps);)
-          {
-              LockedAmounts const *locked_tx = locked_tx_end_timestamps + locked_tx_end_timestamps_index;
-              if (blk.timestamp >= locked_tx->time)
-              {
-                  ++locked_tx_end_timestamps_index;
-              }
-              else
-              {
-                  break;
-              }
-          }
-      }
-    }
-
 
     // read stored emission data if possible
     if (boost::filesystem::exists(emmision_saved_file))
@@ -210,7 +74,6 @@ CurrentBlockchainStatus::start_monitor_blockchain_thread()
                        // scan 10000 blocks for emissiom or if we are at the top of
                        // the blockchain, only few top blocks
                        update_current_emission_amount();
-                       update_circulating_supply();
 
                        cout << "current emission: " << string(current_emission) << endl;
 
@@ -244,7 +107,6 @@ CurrentBlockchainStatus::start_monitor_blockchain_thread()
     } //  if (!is_running)
 }
 
-
 void
 CurrentBlockchainStatus::update_current_emission_amount()
 {
@@ -263,53 +125,62 @@ CurrentBlockchainStatus::update_current_emission_amount()
                 ? current_blockchain_height - blockchain_chunk_gap
                 : end_block;
 
-    Emission emission_calculated = calculate_emission_in_blocks(blk_no, end_block);
+    uint64_t unlocked = 0;
+    Emission emission_calculated = calculate_emission_in_blocks(blk_no, end_block, unlocked);
 
-    current_emission.coinbase += emission_calculated.coinbase;
-    current_emission.fee      += emission_calculated.fee;
-    current_emission.blk_no    = emission_calculated.blk_no;
+    current_emission.coinbase           += emission_calculated.coinbase;
+    current_emission.circulating_supply += emission_calculated.circulating_supply + unlocked;
+    current_emission.fee                += emission_calculated.fee;
+    current_emission.burn               += emission_calculated.burn;
+    current_emission.blk_no              = emission_calculated.blk_no;
 
     total_emission_atomic = current_emission;
 }
 
 CurrentBlockchainStatus::Emission
-CurrentBlockchainStatus::calculate_emission_in_blocks(
-        uint64_t start_blk, uint64_t end_blk)
+CurrentBlockchainStatus::calculate_emission_in_blocks(uint64_t start_blk, uint64_t end_blk, uint64_t &unlocked)
 {
-    Emission emission_calculated {0, 0, 0};
+    // NOTE: Copied from cryptonote_core::get_coinbase_tx_sum
+    Emission emission_calculated = {};
+    unlocked = 0;
 
-    while (start_blk < end_blk)
+    for (;start_blk < end_blk; start_blk++)
     {
-        block blk;
+      block blk;
+      mcore->get_block_by_height(start_blk, blk);
 
-        mcore->get_block_by_height(start_blk, blk);
+      uint64_t coinbase = get_outs_money_amount(blk.miner_tx);
 
-        uint64_t coinbase_amount = get_outs_money_amount(blk.miner_tx);
+      std::vector<transaction> txs;
+      std::vector<crypto::hash> missed_txs;
+      core_storage->get_transactions(blk.tx_hashes, txs, missed_txs);
+      (void)missed_txs;
 
-        vector<transaction> txs;
-        vector<crypto::hash> missed_txs;
+      uint64_t fee = 0, burn = 0;
+      for(const auto& tx: txs)
+      {
+        fee += get_tx_miner_fee(tx, blk.major_version >= HF_VERSION_FEE_BURNING);
+        if(blk.major_version >= HF_VERSION_FEE_BURNING)
+          burn += get_burned_amount_from_tx_extra(tx.extra);
+      }
 
-        uint64_t tx_fee_amount = 0;
+      emission_calculated.coinbase           += coinbase - (fee + burn);
+      emission_calculated.circulating_supply += coinbase - (fee + burn);
+      emission_calculated.fee                += fee;
+      emission_calculated.burn               += burn;
 
-        core_storage->get_transactions(blk.tx_hashes, txs, missed_txs);
+      if (start_blk == 0)
+      {
+        for (auto const &it : time_locked_loki)
+            emission_calculated.circulating_supply -= it.second;
+      }
 
-        for(const auto& tx: txs)
-        {
-            tx_fee_amount += get_tx_miner_fee(tx, false /*don't subtract burned amount*/);
-
-            // FIXME: calculate, store, and show burned amounts
-        }
-
-        (void) missed_txs;
-
-        emission_calculated.coinbase += coinbase_amount - tx_fee_amount;
-        emission_calculated.fee      += tx_fee_amount;
-
-        ++start_blk;
+      auto unlock_it = time_locked_loki.find(start_blk);
+      if (unlock_it != time_locked_loki.end())
+          unlocked += unlock_it->second;
     }
 
-    emission_calculated.blk_no  = start_blk;
-
+    emission_calculated.blk_no = start_blk;
     return emission_calculated;
 }
 
@@ -361,15 +232,16 @@ CurrentBlockchainStatus::load_current_emission_amount()
     }
 
     Emission emission_loaded = {};
-
     uint64_t read_check_sum {0};
-
+    int index = 0;
     try
     {
-        emission_loaded.blk_no             = boost::lexical_cast<uint64_t>(strs.at(0));
-        emission_loaded.coinbase           = boost::lexical_cast<uint64_t>(strs.at(1));
-        emission_loaded.fee                = boost::lexical_cast<uint64_t>(strs.at(2));
-        read_check_sum                     = boost::lexical_cast<uint64_t>(strs.at(3));
+        emission_loaded.blk_no             = boost::lexical_cast<uint64_t>(strs.at(index++));
+        emission_loaded.coinbase           = boost::lexical_cast<uint64_t>(strs.at(index++));
+        emission_loaded.fee                = boost::lexical_cast<uint64_t>(strs.at(index++));
+        emission_loaded.circulating_supply = boost::lexical_cast<uint64_t>(strs.at(index++));
+        emission_loaded.burn               = boost::lexical_cast<uint64_t>(strs.at(index++));
+        read_check_sum                     = boost::lexical_cast<uint64_t>(strs.at(index++));
     }
     catch (boost::bad_lexical_cast &e)
     {
@@ -387,7 +259,6 @@ CurrentBlockchainStatus::load_current_emission_amount()
     }
 
     total_emission_atomic = emission_loaded;
-
     return true;
 
 }
@@ -427,16 +298,17 @@ CurrentBlockchainStatus::get_emission()
                     ? current_blockchain_height : end_block;
 
         // calculated emission for missing blocks
+        uint64_t unlocked = 0;
         Emission gap_emission_calculated
-                = calculate_emission_in_blocks(start_blk, end_block);
+                = calculate_emission_in_blocks(start_blk, end_block, unlocked);
 
-        //cout << "gap_emission_calculated: " << std::string(gap_emission_calculated) << endl;
-
-        current_emission.coinbase += gap_emission_calculated.coinbase;
-        current_emission.fee      += gap_emission_calculated.fee;
-        current_emission.blk_no    = gap_emission_calculated.blk_no > 0
-                                     ? gap_emission_calculated.blk_no
-                                     : current_emission.blk_no;
+        current_emission.coinbase           += gap_emission_calculated.coinbase;
+        current_emission.circulating_supply += gap_emission_calculated.circulating_supply + unlocked;
+        current_emission.fee                += gap_emission_calculated.fee;
+        current_emission.burn               += gap_emission_calculated.burn;
+        current_emission.blk_no              = gap_emission_calculated.blk_no > 0
+                                               ? gap_emission_calculated.blk_no
+                                               : current_emission.blk_no;
     }
 
     return current_emission;
@@ -457,9 +329,6 @@ string CurrentBlockchainStatus::output_file {"emission_amount.txt"};
 string CurrentBlockchainStatus::daemon_url {"http:://127.0.0.1:22023"};
 
 uint64_t  CurrentBlockchainStatus::blockchain_chunk_size {10000};
-uint64_t  CurrentBlockchainStatus::circulating_supply {DAY_0_CIRC_SUPPLY};
-uint64_t  CurrentBlockchainStatus::circulating_supply_calc_from_height {1};
-bool      CurrentBlockchainStatus::circulating_supply_is_accurate {true};
 uint64_t  CurrentBlockchainStatus::blockchain_chunk_gap {3};
 
 atomic<uint64_t> CurrentBlockchainStatus::current_height {0};

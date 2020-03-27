@@ -74,4 +74,5 @@ include_directories(
     ${LOKI_SOURCE_DIR}/build
     ${LOKI_SOURCE_DIR}/external/easylogging++
     ${LOKI_SOURCE_DIR}/contrib/epee/include
+    ${LOKI_SOURCE_DIR}/external/loki-mq
     ${LOKI_SOURCE_DIR}/external/db_drivers/liblmdb)

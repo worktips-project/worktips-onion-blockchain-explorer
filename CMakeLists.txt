@@ -131,6 +131,7 @@ set(LIBRARIES
         unbound
         curl
         crypto
+        sqlite3
         ssl)
 
 if(APPLE)

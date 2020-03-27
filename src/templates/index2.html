@@ -54,15 +54,18 @@
         </p>
     {{/network_info}}
 
-    <p>TX Types Legend: Registration: 🏁 | Contribution: ⚑ | Recommission: 👍 | Decommission: 👎 | Deregister: 🚫 | IP Change Penalty: 📋 | Stake Unlock: 🔓</p>
+    <p>
+    TX Types Legend</br>
+      Service Node - Registration: 🏁 | Contribution: ⚑ | Recommission: 👍 | Decommission: 👎 | Deregister: 🚫 | IP Change Penalty: 📋 | Stake Unlock: 🔓</br>
+      Loki Name System - Buy: 🎫 | Update: 💾 
+    </p>
 
     {{#emission}}
         <p style="margin-top: 2px">
-            Circulating Supply: {{circulating_supply}}
-            {{^circulating_supply_is_up_to_date}}
-            <span style="color:#ff6b62">(calculating)</span>
-            {{/circulating_supply_is_up_to_date}}
-            | Loki emission (fees) is {{amount}} ({{fee_amount}}) as of {{blk_no}} block
+        Circulating Supply*: {{supply}} (Coinbase: {{coinbase}} | Fees: {{fee_amount}} | Burn: {{burn_amount}}) Loki as of block {{blk_no}}.
+        </p>
+        <p style="padding: 0px; font-size: 0.8em">
+            *Circulating supply may exclude any currently, publicised locked tokens, otherwise it is equal to the Coinbase.
         </p>
     {{/emission}}
 </div>
