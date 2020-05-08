@@ -2,16 +2,16 @@
 // Created by mwo on 16/05/17.
 //
 
-#ifndef LOKBLOCKS_CURRENTBLOCKCHAINSTATUS_H
-#define LOKBLOCKS_CURRENTBLOCKCHAINSTATUS_H
+#ifndef WTIPBLOCKS_CURRENTBLOCKCHAINSTATUS_H
+#define WTIPBLOCKS_CURRENTBLOCKCHAINSTATUS_H
 
 #include "mstch/mstch.hpp"
-#include "loki_headers.h"
+#include "worktips_headers.h"
 #include "MicroCore.h"
 
 #include <boost/algorithm/string.hpp>
 
-namespace lokeg
+namespace wtipeg
 {
 
 using namespace std;
@@ -114,4 +114,4 @@ struct CurrentBlockchainStatus
 
 }
 
-#endif //LOKBLOCKS_CURRENTBLOCKCHAINSTATUS_H
+#endif //WTIPBLOCKS_CURRENTBLOCKCHAINSTATUS_H
