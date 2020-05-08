@@ -118,7 +118,7 @@ set(LIBRARIES
         ringct
         ringct_basic
         device
-        randomx
+        argon2
         common
         mnemonics
         easylogging

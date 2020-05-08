@@ -28,7 +28,7 @@
 # (c) 2014-2016 cpp-ethereum contributors.
 #------------------------------------------------------------------------------
 
-set(LIBS common;blocks;cryptonote_basic;cryptonote_core;multisig;randomx;
+set(LIBS common;blocks;cryptonote_basic;cryptonote_core;multisig;argon2;
 		cryptonote_protocol;daemonizer;mnemonics;epee;lmdb;device;
 		blockchain_db;ringct;wallet;cncrypto;easylogging;version;checkpoints)
 
@@ -44,7 +44,7 @@ foreach (l ${LIBS})
 	find_library(WTIP_${L}_LIBRARY
 		NAMES ${l}
 		PATHS ${CMAKE_LIBRARY_PATH}
-		PATH_SUFFIXES "/src/${l}" "/src/" "/external/db_drivers/lib${l}" "/lib" "/src/crypto" "/contrib/epee/src" "/external/easylogging++/" "/external/randomx/"
+		PATH_SUFFIXES "/src/${l}" "/src/" "/external/db_drivers/lib${l}" "/lib" "/src/crypto" "/contrib/epee/src" "/external/easylogging++/" "/external/argon2/"
 		NO_DEFAULT_PATH
 	)
 
@@ -71,6 +71,7 @@ message(STATUS ${WORKTIPS_SOURCE_DIR}/build)
 include_directories(
     ${WORKTIPS_SOURCE_DIR}/src
     ${WORKTIPS_SOURCE_DIR}/external
+	${WORKTIPS_SOURCE_DIR}/external/argon2/include
     ${WORKTIPS_SOURCE_DIR}/build
     ${WORKTIPS_SOURCE_DIR}/external/easylogging++
     ${WORKTIPS_SOURCE_DIR}/contrib/epee/include
